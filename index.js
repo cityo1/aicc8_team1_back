@@ -10,6 +10,8 @@ import authRoutes from "./src/routes/auth.routes.js";
 import mfdsRoutes from "./src/routes/mfds.routes.js";
 import diaryRoutes from "./src/routes/diary.routes.js";
 import { pool } from "./src/config/db.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./src/config/swagger.js";
 
 
 const app = express();
@@ -17,6 +19,9 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Swagger Documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get("/", (req, res) => {
   res.send("This is the Main App for Deployment");
