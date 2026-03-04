@@ -20,6 +20,8 @@ import swaggerSpec from "./src/config/swagger.js";
 
 const app = express();
 
+// test
+
 app.use(cors({
   origin: 'http://localhost:5173',
   credentials: true
