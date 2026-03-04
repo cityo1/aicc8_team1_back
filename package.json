@@ -25,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "nodemon": "^3.1.14",
+    "openai": "^6.25.0",
     "path": "^0.12.7",
     "pg": "^8.19.0",
     "swagger-jsdoc": "^6.2.8",
