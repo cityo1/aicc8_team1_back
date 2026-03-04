@@ -13,6 +13,7 @@ import userRoutes from "./src/routes/userRoutes.js";
 import deficiencyRoutes from "./src/routes/deficiency.routes.js";
 import googleSheetsRoutes from "./src/routes/google_sheets_routes.js";
 import foodsRoutes from "./src/routes/foods_routes.js";
+import scanRoutes from "./src/routes/scan.routes.js";
 import { pool } from "./src/config/db.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
@@ -44,6 +45,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/deficiency", deficiencyRoutes);
 app.use("/api/google-sheets", googleSheetsRoutes);
 app.use("/api/foods", foodsRoutes);
+app.use("/api/scan", scanRoutes);
 
 app.get("/api/db/ping", async (req, res) => {
   try {
