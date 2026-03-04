@@ -9,6 +9,10 @@ import mealsRoutes from "./src/routes/meals_routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
 import mfdsRoutes from "./src/routes/mfds.routes.js";
 import diaryRoutes from "./src/routes/diary.routes.js";
+import userRoutes from "./src/routes/userRoutes.js";
+import deficiencyRoutes from "./src/routes/deficiency.routes.js";
+import googleSheetsRoutes from "./src/routes/google_sheets_routes.js";
+import foodsRoutes from "./src/routes/foods_routes.js";
 import { pool } from "./src/config/db.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
@@ -34,6 +38,10 @@ app.use("/api/meals", mealsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/mfds", mfdsRoutes);
 app.use("/api/diary", diaryRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/deficiency", deficiencyRoutes);
+app.use("/api/google-sheets", googleSheetsRoutes);
+app.use("/api/foods", foodsRoutes);
 
 app.get("/api/db/ping", async (req, res) => {
   try {
