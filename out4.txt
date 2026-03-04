@@ -1,0 +1,47 @@
+[dotenv@17.3.1] injecting env (12) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+createUser 에러: error: column "gender" of relation "users" does not exist
+    at c:\Hijin\MyProject\aicc8_team1_back\aicc8_team1_back\node_modules\pg\lib\client.js:631:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async createUser (file:///c:/Hijin/MyProject/aicc8_team1_back/aicc8_team1_back/src/models/userModel.js:65:28)
+    at async testSignup (file:///c:/Hijin/MyProject/aicc8_team1_back/aicc8_team1_back/test_signup.js:6:21) {
+  length: 124,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '69',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1075',
+  routine: 'checkInsertTargets'
+}
+Error: error: column "gender" of relation "users" does not exist
+    at c:\Hijin\MyProject\aicc8_team1_back\aicc8_team1_back\node_modules\pg\lib\client.js:631:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async createUser (file:///c:/Hijin/MyProject/aicc8_team1_back/aicc8_team1_back/src/models/userModel.js:65:28)
+    at async testSignup (file:///c:/Hijin/MyProject/aicc8_team1_back/aicc8_team1_back/test_signup.js:6:21) {
+  length: 124,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '69',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1075',
+  routine: 'checkInsertTargets'
+}

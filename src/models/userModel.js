@@ -42,18 +42,26 @@ const findUserByNickname = async (nickname) => {
  * @param {string} nickname
  * @returns {Promise<Object>}
  */
-const createUser = async (id, email, password_hash, nickname) => {
+const createUser = async (id, email, password_hash, nickname, gender, age_group, height, weight, goals, dietary_restrictions) => {
     // 트랜잭션을 사용하여 users와 user_settings 테이블에 동시 삽입
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
         const insertUserQuery = `
-            INSERT INTO users (id, email, password_hash, nickname)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, email, nickname, created_at;
+            INSERT INTO users (id, email, password_hash, nickname, gender, age_group, height, weight, goals, dietary_restrictions)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, email, nickname, gender, age_group, height, weight, goals, dietary_restrictions, created_at;
         `;
-        const userValues = [id, email, password_hash, nickname];
+        const userValues = [
+            id, email, password_hash, nickname,
+            gender || null,
+            age_group || null,
+            height || null,
+            weight || null,
+            goals ? JSON.stringify(goals) : '[]',
+            dietary_restrictions ? JSON.stringify(dietary_restrictions) : '[]'
+        ];
         const userResult = await client.query(insertUserQuery, userValues);
         const newUser = userResult.rows[0];
 
