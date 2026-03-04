@@ -11,7 +11,10 @@ import { findUserByEmail, findUserByNickname, createUser } from "../models/userM
 
 const signup = async (req, res) => {
     try {
-        const { email, password, nickname } = req.body;
+        const {
+            email, password, nickname,
+            gender, age_group, height, weight, goals, dietary_restrictions
+        } = req.body;
 
         // 필수 값 검증
         if (!email || !password || !nickname) {
@@ -32,7 +35,10 @@ const signup = async (req, res) => {
         const userId = uuidv4();
 
         // 사용자 생성 (DB 저장)
-        const newUser = await createUser(userId, email, passwordHash, nickname);
+        const newUser = await createUser(
+            userId, email, passwordHash, nickname,
+            gender, age_group, height, weight, goals, dietary_restrictions
+        );
 
         // 비밀번호 해시 제외 후 반환
         res.status(201).json({
@@ -41,6 +47,12 @@ const signup = async (req, res) => {
                 id: newUser.id,
                 email: newUser.email,
                 nickname: newUser.nickname,
+                gender: newUser.gender,
+                ageGroup: newUser.age_group,
+                height: newUser.height,
+                weight: newUser.weight,
+                goals: newUser.goals,
+                dietaryRestrictions: newUser.dietary_restrictions,
                 createdAt: newUser.created_at
             }
         });
