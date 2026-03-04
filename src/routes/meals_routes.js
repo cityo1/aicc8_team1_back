@@ -6,7 +6,48 @@ const router = express.Router();
 
 
 
-// POST /api/meals
+/**
+ * @swagger
+ * tags:
+ *   name: Meals
+ *   description: Meal logging and nutrition
+ */
+
+/**
+ * @swagger
+ * /api/meals:
+ *   post:
+ *     summary: Log a meal
+ *     tags: [Meals]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - foodCode
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               foodCode:
+ *                 type: string
+ *               servings:
+ *                 type: number
+ *                 default: 1
+ *               mealType:
+ *                 type: string
+ *                 enum: [breakfast, lunch, dinner, snack]
+ *               eatenAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: Meal logged successful
+ *       400:
+ *         description: Invalid input
+ */
 router.post("/", async (req, res) => {
     try {
         const {

@@ -4,9 +4,37 @@ import { pool } from "../config/db.js";
 const router = express.Router();
 
 /**
- * [GET] /api/diary/daily
- * 특정 사용자의 특정 날짜 식단 기록 전체 조회
- * Query: userId, date (YYYY-MM-DD)
+ * @swagger
+ * tags:
+ *   name: Diary
+ *   description: Food diary and meal logging
+ */
+
+/**
+ * @swagger
+ * /api/diary/daily:
+ *   get:
+ *     summary: Get all diet records for a specific date
+ *     tags: [Diary]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: List of diary entries
+ *       400:
+ *         description: Missing userId or date
  */
 router.get("/daily", async (req, res) => {
     try {
