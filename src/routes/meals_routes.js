@@ -161,20 +161,21 @@ router.post("/", async (req, res) => {
 
             // Determine the date for the summary
             const targetDate = eatenAt ? new Date(eatenAt).toISOString().split('T')[0] : 'CURRENT_DATE';
-            const dateStr = targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : `$7`;
+            // 수정: parameter 번호를 $8로 변경 (total_sugars가 $7을 사용 중)
+            const dateStr = targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : `$8`;
 
             const upsertParams = [
-                uuidv4(), // id for new summary
-                userId,
-                addCalories,
-                addCarbs,
-                addProtein,
-                addFat,
-                addSugars
+                uuidv4(),    // $1: id 
+                userId,      // $2: user_id
+                addCalories, // $3: total_calories
+                addCarbs,    // $4: total_carbohydrate
+                addProtein,  // $5: total_protein
+                addFat,      // $6: total_fat
+                addSugars    // $7: total_sugars
             ];
 
             if (targetDate !== 'CURRENT_DATE') {
-                upsertParams.push(targetDate);
+                upsertParams.push(targetDate); // $8: summary_date
             }
 
             // 6-2) Upsert daily_summaries
