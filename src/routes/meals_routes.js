@@ -75,11 +75,12 @@ router.get("/search", async (req, res) => {
  *             type: object
  *             required:
  *               - userId
- *               - foodCode
  *             properties:
  *               userId:
  *                 type: string
  *               foodCode:
+ *                 type: string
+ *               foodName:
  *                 type: string
  *               servings:
  *                 type: number
@@ -129,12 +130,78 @@ router.post("/", async (req, res) => {
         // 4) UUID 생성 (DB에서 안 만들고 Node에서 만듦)
         const id = uuidv4();
 
-        // 5) INSERT into diary_entries
+        // 5) foods 테이블에서 영양소 정보 가져오기
+        const foodRes = await pool.query(
+            `SELECT food_name, calories, carbohydrate, protein, fat, sugars, sodium, cholesterol, saturated_fat, trans_fat 
+             FROM foods 
+             WHERE food_code = $1`,
+            [foodCode]
+        );
+
+        let snapData = {
+            snap_food_name: null,
+            snap_calories: null,
+            snap_carbohydrate: null,
+            snap_protein: null,
+            snap_fat: null,
+            snap_sugars: null,
+            snap_sodium: null,
+            snap_cholesterol: null,
+            snap_saturated_fat: null,
+            snap_trans_fat: null
+        };
+
+        if (foodRes.rows.length > 0) {
+            const food = foodRes.rows[0];
+            // 제공량(servings)을 곱해서 snap_* 에 넣습니다.
+            snapData = {
+                snap_food_name: food.food_name || null,
+                snap_calories: food.calories != null ? (Number(food.calories) * s) : null,
+                snap_carbohydrate: food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null,
+                snap_protein: food.protein != null ? (Number(food.protein) * s) : null,
+                snap_fat: food.fat != null ? (Number(food.fat) * s) : null,
+                snap_sugars: food.sugars != null ? (Number(food.sugars) * s) : null,
+                snap_sodium: food.sodium != null ? (Number(food.sodium) * s) : null,
+                snap_cholesterol: food.cholesterol != null ? (Number(food.cholesterol) * s) : null,
+                snap_saturated_fat: food.saturated_fat != null ? (Number(food.saturated_fat) * s) : null,
+                snap_trans_fat: food.trans_fat != null ? (Number(food.trans_fat) * s) : null
+            };
+        }
+
+        // 6) INSERT into diary_entries (가져온 영양소 값 포함)
         const result = await pool.query(
-            `INSERT INTO diary_entries (id, user_id, food_code, meal_type, amount, meal_time)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, NOW()))
-       RETURNING *`,
-            [id, userId, foodCode, mealType, s, eatenAt]
+            `INSERT INTO diary_entries (
+                id, user_id, food_code, meal_type, amount, meal_time,
+                snap_food_name, snap_calories, snap_carbohydrate, snap_protein, 
+                snap_fat, snap_sugars, snap_sodium, snap_cholesterol, snap_saturated_fat, snap_trans_fat,
+                created_at, updated_at
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, 
+                COALESCE($6::timestamptz, NOW()), 
+                $7, $8, $9, $10, 
+                $11, $12, $13, $14, $15, $16,
+                NOW(), NOW()
+            )
+            RETURNING *`,
+            [
+                id,
+                userId,
+                foodCode,
+                mealType,
+                s,
+                eatenAt,
+                snapData.snap_food_name,
+                snapData.snap_calories,
+                snapData.snap_carbohydrate,
+                snapData.snap_protein,
+                snapData.snap_fat,
+                snapData.snap_sugars,
+                snapData.snap_sodium,
+                snapData.snap_cholesterol,
+                snapData.snap_saturated_fat,
+                snapData.snap_trans_fat
+            ]
         );
 
         const newEntry = result.rows[0];
@@ -144,8 +211,9 @@ router.post("/", async (req, res) => {
             message: "식단 입력이 완료되었습니다.",
             data: newEntry
         });
+
     } catch (err) {
-        console.error(err);
+        console.error("Meal POST error:", err);
         // Foreign key violation check (e.g. food_code not found in foods table)
         if (err.code === '23503') {
             return res.status(400).json({
