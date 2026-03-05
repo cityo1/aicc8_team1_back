@@ -3,7 +3,42 @@ import { searchFoodByName } from "../services/mfdsService.js";
 
 const router = express.Router();
 
-// GET /api/mfds/search?query=우유&page=1&size=20
+/**
+ * @swagger
+ * tags:
+ *   name: MFDS
+ *   description: Food search via MFDS API
+ */
+
+/**
+ * @swagger
+ * /api/mfds/search:
+ *   get:
+ *     summary: Search for food by name
+ *     tags: [MFDS]
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Food name to search for
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Search results
+ *       400:
+ *         description: Missing query
+ */
 router.get("/search", async (req, res) => {
     try {
         const { query, page, size } = req.query;

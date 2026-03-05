@@ -4,9 +4,37 @@ import { pool } from "../config/db.js";
 const router = express.Router();
 
 /**
- * [GET] /api/diary/daily
- * 특정 사용자의 특정 날짜 식단 기록 전체 조회
- * Query: userId, date (YYYY-MM-DD)
+ * @swagger
+ * tags:
+ *   name: Diary
+ *   description: Food diary and meal logging
+ */
+
+/**
+ * @swagger
+ * /api/diary/daily:
+ *   get:
+ *     summary: Get all diet records for a specific date
+ *     tags: [Diary]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: List of diary entries
+ *       400:
+ *         description: Missing userId or date
  */
 router.get("/daily", async (req, res) => {
     try {
@@ -24,6 +52,71 @@ router.get("/daily", async (req, res) => {
             ORDER BY de.meal_time ASC
         `;
         const result = await pool.query(query, [userId, date]);
+
+        return res.json({ success: true, count: result.rows.length, data: result.rows });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/diary/meal-summary:
+ *   get:
+ *     summary: Get nutritional summary for a specific meal (e.g., 아침, 점심)
+ *     tags: [Diary]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the user
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date (YYYY-MM-DD)
+ *       - in: query
+ *         name: mealType
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Meal type (e.g., 아침, 점심, 저녁, 간식)
+ *     responses:
+ *       200:
+ *         description: List of items eaten for the specific meal and their calculated nutritional values
+ *       400:
+ *         description: Missing parameters
+ */
+router.get("/meal-summary", async (req, res) => {
+    try {
+        const { userId, date, mealType } = req.query;
+
+        if (!userId || !date || !mealType) {
+            return res.status(400).json({ success: false, message: "userId, date, mealType는 필수입니다." });
+        }
+
+        const query = `
+            SELECT 
+                d.meal_type,
+                d.amount,
+                f.food_name, 
+                (f.calories * d.amount) AS total_calories,
+                (f.carbohydrate * d.amount) AS total_carbs,
+                (f.protein * d.amount) AS total_protein,
+                (f.fat * d.amount) AS total_fat,
+                (f.sugars * d.amount) AS total_sugars
+            FROM diary_entries d
+            JOIN foods f ON d.food_code = f.food_code
+            WHERE d.user_id = $1 
+              AND d.meal_type = $2
+              AND DATE(d.meal_time) = $3;
+        `;
+        const result = await pool.query(query, [userId, mealType, date]);
 
         return res.json({ success: true, count: result.rows.length, data: result.rows });
     } catch (err) {
