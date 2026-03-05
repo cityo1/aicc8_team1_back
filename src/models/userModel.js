@@ -82,4 +82,62 @@ const createUser = async (id, email, password_hash, nickname, gender, age_group,
     }
 };
 
-export { findUserByEmail, findUserByNickname, createUser };
+/**
+ * 비밀번호 재설정 인증 코드 저장
+ */
+const savePasswordResetCode = async (email, code, expiresAt) => {
+    const query = `
+        INSERT INTO password_resets (email, code, expires_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (email) 
+        DO UPDATE SET code = EXCLUDED.code, reset_token = NULL, expires_at = EXCLUDED.expires_at
+    `;
+    await pool.query(query, [email, code, expiresAt]);
+};
+
+/**
+ * 이메일로 비밀번호 재설정 정보 조회
+ */
+const findPasswordResetInfo = async (email) => {
+    const query = 'SELECT * FROM password_resets WHERE email = $1';
+    const { rows } = await pool.query(query, [email]);
+    return rows[0];
+};
+
+/**
+ * 검증 성공 시 reset_token 저장
+ */
+const savePasswordResetToken = async (email, resetToken, expiresAt) => {
+    const query = `
+        UPDATE password_resets
+        SET code = NULL, reset_token = $2, expires_at = $3
+        WHERE email = $1
+    `;
+    await pool.query(query, [email, resetToken, expiresAt]);
+};
+
+/**
+ * 비밀번호 업데이트 및 리셋 정보 삭제
+ */
+const updateUserPassword = async (email, newPasswordHash) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 비밀번호 업데이트
+        await client.query('UPDATE users SET password_hash = $1 WHERE email = $2', [newPasswordHash, email]);
+
+        // 사용된 토큰/코드 정보 삭제
+        await client.query('DELETE FROM password_resets WHERE email = $1', [email]);
+
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error("updateUserPassword 에러:", error);
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+export { findUserByEmail, findUserByNickname, createUser, savePasswordResetCode, findPasswordResetInfo, savePasswordResetToken, updateUserPassword };
