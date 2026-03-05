@@ -139,76 +139,10 @@ router.post("/", async (req, res) => {
 
         const newEntry = result.rows[0];
 
-        // 6) Calculate total nutrition and upsert daily_summaries
-        // 6-1) Fetch food nutrition details
-        const foodResult = await pool.query(
-            `SELECT calories, carbohydrate, protein, fat, sugars 
-             FROM foods WHERE food_code = $1`,
-            [foodCode]
-        );
-
-        let dailySummary = null;
-
-        if (foodResult.rows.length > 0) {
-            const food = foodResult.rows[0];
-
-            // Calculate intake based on servings
-            const addCalories = (Number(food.calories) || 0) * s;
-            const addCarbs = (Number(food.carbohydrate) || 0) * s;
-            const addProtein = (Number(food.protein) || 0) * s;
-            const addFat = (Number(food.fat) || 0) * s;
-            const addSugars = (Number(food.sugars) || 0) * s;
-
-            // Determine the date for the summary
-            const targetDate = eatenAt ? new Date(eatenAt).toISOString().split('T')[0] : 'CURRENT_DATE';
-            // 수정: parameter 번호를 $8로 변경 (total_sugars가 $7을 사용 중)
-            const dateStr = targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : `$8`;
-
-            const upsertParams = [
-                uuidv4(),    // $1: id 
-                userId,      // $2: user_id
-                addCalories, // $3: total_calories
-                addCarbs,    // $4: total_carbohydrate
-                addProtein,  // $5: total_protein
-                addFat,      // $6: total_fat
-                addSugars    // $7: total_sugars
-            ];
-
-            if (targetDate !== 'CURRENT_DATE') {
-                upsertParams.push(targetDate); // $8: summary_date
-            }
-
-            // 6-2) Upsert daily_summaries
-            const upsertQuery = `
-                INSERT INTO daily_summaries (
-                    id, user_id, summary_date, 
-                    total_calories, total_carbohydrate, total_protein, total_fat, total_sugars,
-                    created_at, updated_at
-                )
-                VALUES (
-                    $1, $2, ${dateStr}, 
-                    $3, $4, $5, $6, $7,
-                    NOW(), NOW()
-                )
-                ON CONFLICT (user_id, summary_date)
-                DO UPDATE SET
-                    total_calories = COALESCE(daily_summaries.total_calories, 0) + EXCLUDED.total_calories,
-                    total_carbohydrate = COALESCE(daily_summaries.total_carbohydrate, 0) + EXCLUDED.total_carbohydrate,
-                    total_protein = COALESCE(daily_summaries.total_protein, 0) + EXCLUDED.total_protein,
-                    total_fat = COALESCE(daily_summaries.total_fat, 0) + EXCLUDED.total_fat,
-                    total_sugars = COALESCE(daily_summaries.total_sugars, 0) + EXCLUDED.total_sugars,
-                    updated_at = NOW()
-                RETURNING *;
-            `;
-
-            const summaryResult = await pool.query(upsertQuery, upsertParams);
-            dailySummary = summaryResult.rows[0];
-        }
-
         return res.json({
             success: true,
-            data: newEntry,
-            dailySummary: dailySummary
+            message: "식단 입력이 완료되었습니다.",
+            data: newEntry
         });
     } catch (err) {
         console.error(err);
