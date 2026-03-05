@@ -250,6 +250,19 @@ CREATE TABLE IF NOT EXISTS community_reports (
     UNIQUE (post_id, user_id)
 );
 
+-- 16. meal_food_items (식단 음식 항목) meal_logs 1:N
+CREATE TABLE meal_food_items (
+    item_id         SERIAL PRIMARY KEY,
+    meal_log_id     UUID NOT NULL REFERENCES meal_logs(id) ON DELETE CASCADE,
+    food_code       VARCHAR(50) NOT NULL REFERENCES foods(food_code),
+    amount_g        NUMERIC(6,2) NOT NULL DEFAULT 100,  -- 섭취량 (g)
+    item_calories   NUMERIC(7,2),                       -- 해당 음식의 칼로리
+    item_carbs      NUMERIC(6,2),
+    item_protein    NUMERIC(6,2),
+    item_fat        NUMERIC(6,2),
+    item_sugar      NUMERIC(6,2)
+);
+
 -- ✅ 생성 확인용
 SELECT tablename
 FROM pg_tables

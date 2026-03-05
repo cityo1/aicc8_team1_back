@@ -24,6 +24,7 @@
     "fs": "^0.0.1-security",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.1",
     "nodemon": "^3.1.14",
     "openai": "^6.25.0",
     "path": "^0.12.7",
