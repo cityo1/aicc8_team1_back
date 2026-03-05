@@ -144,13 +144,18 @@ router.post('/sheet/import', async (req, res) => {
 router.get('/search', async (req, res) => {
     try {
         const { name } = req.query;
+
         if (!name) {
             return res.status(400).json({ success: false, message: "검색할 식품명을 쿼리로(query) 전달해주세요. (예: ?name=식혜)" });
         }
 
+        // ✅ 방어 코드 추가: 앞뒤 공백 제거 및 혹시 모를 따옴표(" '), 유령 문자(Zero-width space) 제거
+        const cleanName = name.trim().replace(/['"\u200B-\u200D\uFEFF]/g, '').normalize('NFC');
+
+
         // food_name에 검색어가 포함된 데이터 최대 10개 조회
-        const query = `SELECT * FROM foods WHERE food_name LIKE $1 LIMIT 10`;
-        const result = await pool.query(query, [`%${name}%`]);
+        const query = "SELECT * FROM foods WHERE food_name LIKE $1 LIMIT 10";
+        const result = await pool.query(query, [`%${cleanName}%`]);
 
         res.json({
             success: true,

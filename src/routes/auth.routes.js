@@ -9,7 +9,7 @@ const router = express.Router();
  *   name: Auth
  *   description: User authentication and management
  */
-
+// test
 /**
  * @swagger
  * /api/auth/signup:
@@ -97,6 +97,42 @@ router.post("/refresh", userController.refresh);
  *         description: Logout successful
  */
 router.post("/logout", userController.logout);
+
+/**
+ * @swagger
+ * /api/auth/forgot-password/send-code:
+ *   post:
+ *     summary: 비밀번호 찾기 (인증 코드 이메일 발송)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 코드 발송 성공
+ * /api/auth/forgot-password/verify-code:
+ *   post:
+ *     summary: 인증 코드 검증
+ *     tags: [Auth]
+ * /api/auth/forgot-password/reset-password:
+ *   post:
+ *     summary: 새 비밀번호 설정
+ *     tags: [Auth]
+ * /api/auth/forgot-password/resend-code:
+ *   post:
+ *     summary: 인증 코드 재발송
+ *     tags: [Auth]
+ */
+router.post("/forgot-password/send-code", userController.sendPasswordResetCode);
+router.post("/forgot-password/verify-code", userController.verifyPasswordResetCode);
+router.post("/forgot-password/reset-password", userController.resetPassword);
+router.post("/forgot-password/resend-code", userController.resendPasswordResetCode);
 
 router.get("/login", (req, res) => {
     res.send("login endpoint alive. Use POST.");

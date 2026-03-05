@@ -1,2 +1,0 @@
-[dotenv@17.3.1] injecting env (12) from .env -- tip: ⚙️  override existing env vars with { override: true }
-users 테이블 업데이터 성공
