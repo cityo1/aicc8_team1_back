@@ -91,7 +91,7 @@ router.get("/daily", async (req, res) => {
                 id: row.id,
                 foodCode: row.food_code,
                 foodName: row.snap_food_name || null,
-                servings: Number(row.amount),
+                servings: Number(row.serving_size),
                 mealTime: row.meal_time,
                 calories: cal,
                 nutrients: {
@@ -182,7 +182,7 @@ router.get("/meal-summary", async (req, res) => {
         const mappedData = result.rows.map(row => ({
             mealType: row.meal_type,
             foodName: row.snap_food_name || "알 수 없는 음식",
-            servings: Number(row.amount),
+            servings: Number(row.serving_size),
             totalCalories: Number(row.snap_calories || 0),
             nutrients: {
                 carbs: Number(row.snap_carbohydrate || 0),
@@ -226,17 +226,17 @@ router.get("/:id", async (req, res) => {
 router.patch("/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, mealType, mealTime } = req.body;
+        const { serving_size, mealType, mealTime } = req.body;
 
         const result = await pool.query(
             `UPDATE diary_entries 
-             SET amount = COALESCE($1, amount),
+             SET serving_size = COALESCE($1, serving_size),
                  meal_type = COALESCE($2, meal_type),
                  meal_time = COALESCE($3, meal_time),
                  updated_at = NOW()
              WHERE id = $4
              RETURNING *`,
-            [amount, mealType, mealTime, id]
+            [serving_size, mealType, mealTime, id]
         );
 
         if (result.rows.length === 0) {

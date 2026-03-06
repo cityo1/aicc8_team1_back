@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS users (
     weight NUMERIC(5,2),
     goals JSONB DEFAULT '[]'::jsonb,
     dietary_restrictions JSONB DEFAULT '[]'::jsonb,
+    receive_notifications BOOLEAN DEFAULT true,  -- 기존 설정에서 이동
+    eating_habits TEXT,                          -- 기존 설정에서 이동
+    allergies TEXT[],                            -- 기존 설정에서 이동
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),        -- 기존 설정에서 이동
     deleted_at TIMESTAMPTZ
 );
 
@@ -48,17 +52,17 @@ CREATE TABLE IF NOT EXISTS password_resets (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. user_settings (사용자 설정) 1:1
-CREATE TABLE IF NOT EXISTS user_settings (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    receive_notifications BOOLEAN DEFAULT true,
-    eating_habits TEXT,
-    allergies TEXT[],
-    height NUMERIC(5,2),
-    weight NUMERIC(5,2),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- -- 2. user_settings (사용자 설정) 1:1
+-- CREATE TABLE IF NOT EXISTS user_settings (
+--     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+--     receive_notifications BOOLEAN DEFAULT true,
+--     eating_habits TEXT,
+--     allergies TEXT[],
+--     height NUMERIC(5,2),
+--     weight NUMERIC(5,2),
+--     created_at TIMESTAMPTZ DEFAULT NOW(),
+--     updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
 
 -- 3. foods (식품 DB)
 CREATE TABLE IF NOT EXISTS foods (
@@ -116,7 +120,7 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     meal_time TIMESTAMPTZ NOT NULL,
     food_code VARCHAR(50) REFERENCES foods(food_code) ON DELETE SET NULL,
     custom_food_id UUID REFERENCES custom_foods(id) ON DELETE SET NULL,
-    amount NUMERIC DEFAULT 1,
+    serving_size NUMERIC,
     snap_food_name VARCHAR(255),
     snap_calories NUMERIC,
     snap_carbohydrate NUMERIC,
