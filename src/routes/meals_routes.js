@@ -102,12 +102,12 @@ router.post("/", async (req, res) => {
         const {
             userId,
             foodCode,
+            foodName = null,
             servings = 1,
             mealType = null,
-            eatenAt = null,
-            note = null,
-            image = null,
+            mealTime = null,
             memo = null,
+            imageUrl = null,
         } = req.body;
 
         // 1) 필수값 체크
@@ -141,7 +141,7 @@ router.post("/", async (req, res) => {
         );
 
         let snapData = {
-            snap_food_name: null,
+            snap_food_name: foodName,
             snap_calories: null,
             snap_carbohydrate: null,
             snap_protein: null,
@@ -157,7 +157,7 @@ router.post("/", async (req, res) => {
             const food = foodRes.rows[0];
             // 제공량(servings)을 곱해서 snap_* 에 넣습니다.
             snapData = {
-                snap_food_name: food.food_name || null,
+                snap_food_name: foodName || food.food_name || null,
                 snap_calories: food.calories != null ? (Number(food.calories) * s) : null,
                 snap_carbohydrate: food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null,
                 snap_protein: food.protein != null ? (Number(food.protein) * s) : null,
@@ -176,6 +176,7 @@ router.post("/", async (req, res) => {
                 id, user_id, food_code, meal_type, amount, meal_time,
                 snap_food_name, snap_calories, snap_carbohydrate, snap_protein, 
                 snap_fat, snap_sugars, snap_sodium, snap_cholesterol, snap_saturated_fat, snap_trans_fat,
+                image_url, memo,
                 created_at, updated_at
             )
             VALUES (
@@ -183,6 +184,7 @@ router.post("/", async (req, res) => {
                 COALESCE($6::timestamptz, NOW()), 
                 $7, $8, $9, $10, 
                 $11, $12, $13, $14, $15, $16,
+                $17, $18,
                 NOW(), NOW()
             )
             RETURNING *`,
@@ -192,7 +194,7 @@ router.post("/", async (req, res) => {
                 foodCode,
                 mealType,
                 s,
-                eatenAt,
+                mealTime,
                 snapData.snap_food_name,
                 snapData.snap_calories,
                 snapData.snap_carbohydrate,
@@ -202,7 +204,9 @@ router.post("/", async (req, res) => {
                 snapData.snap_sodium,
                 snapData.snap_cholesterol,
                 snapData.snap_saturated_fat,
-                snapData.snap_trans_fat
+                snapData.snap_trans_fat,
+                imageUrl,
+                memo
             ]
         );
 
@@ -214,26 +218,21 @@ router.post("/", async (req, res) => {
             message: "식단 입력이 완료되었습니다.",
             data: {
                 id: newEntry.id,
-                user_id: newEntry.user_id,
-                ai_scan_id: newEntry.ai_scan_id || null, // Ensure explicit null mapping
-                meal_type: newEntry.meal_type,
-                meal_time: newEntry.meal_time,
-                food_code: newEntry.food_code,
-                custom_food_id: newEntry.custom_food_id || null,
-                amount: newEntry.amount,
-                snap_food_name: newEntry.snap_food_name,
-                snap_calories: newEntry.snap_calories,
-                snap_carbohydrate: newEntry.snap_carbohydrate,
-                snap_protein: newEntry.snap_protein,
-                snap_fat: newEntry.snap_fat,
-                snap_sugars: newEntry.snap_sugars,
-                snap_sodium: newEntry.snap_sodium,
-                snap_cholesterol: newEntry.snap_cholesterol,
-                snap_saturated_fat: newEntry.snap_saturated_fat,
-                snap_trans_fat: newEntry.snap_trans_fat,
-                created_at: newEntry.created_at,
-                updated_at: newEntry.updated_at,
-                deleted_at: newEntry.deleted_at || null
+                userId: newEntry.user_id,
+                foodCode: newEntry.food_code,
+                foodName: newEntry.snap_food_name || null,
+                mealType: newEntry.meal_type,
+                servings: Number(newEntry.amount),
+                mealTime: newEntry.meal_time,
+                calories: newEntry.snap_calories != null ? Number(newEntry.snap_calories) : null,
+                nutrients: {
+                    carbs: newEntry.snap_carbohydrate != null ? Number(newEntry.snap_carbohydrate) : null,
+                    protein: newEntry.snap_protein != null ? Number(newEntry.snap_protein) : null,
+                    fat: newEntry.snap_fat != null ? Number(newEntry.snap_fat) : null,
+                    sugar: newEntry.snap_sugars != null ? Number(newEntry.snap_sugars) : null
+                },
+                memo: newEntry.memo || null,
+                imageUrl: newEntry.image_url || null
             }
         });
 

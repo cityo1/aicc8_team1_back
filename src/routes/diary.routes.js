@@ -44,16 +44,85 @@ router.get("/daily", async (req, res) => {
             return res.status(400).json({ success: false, message: "userId와 date는 필수입니다." });
         }
 
+        // Query directly from diary_entries using its snapshot values
         const query = `
-            SELECT de.*, f.food_name, f.calories, f.carbohydrate, f.protein, f.fat
-            FROM diary_entries de
-            LEFT JOIN foods f ON de.food_code = f.food_code
-            WHERE de.user_id = $1 AND DATE(de.meal_time) = $2
-            ORDER BY de.meal_time ASC
+            SELECT *
+            FROM diary_entries
+            WHERE user_id = $1 AND DATE(meal_time AT TIME ZONE 'UTC') = $2
+               OR user_id = $1 AND DATE(meal_time) = $2
+            ORDER BY meal_time ASC
         `;
         const result = await pool.query(query, [userId, date]);
 
-        return res.json({ success: true, count: result.rows.length, data: result.rows });
+        const summary = { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 };
+        const meals = {
+            breakfast: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, calories: 0 },
+            lunch: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, calories: 0 },
+            dinner: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, calories: 0 },
+            snack: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, calories: 0 }
+        };
+
+        result.rows.forEach(row => {
+            const mType = row.meal_type || 'snack'; // fallback to snack if empty
+            if (!meals[mType]) meals[mType] = { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, calories: 0 };
+
+            const cal = Number(row.snap_calories || 0);
+            const carb = Number(row.snap_carbohydrate || 0);
+            const prot = Number(row.snap_protein || 0);
+            const fat = Number(row.snap_fat || 0);
+            const sug = Number(row.snap_sugars || 0);
+
+            // Add to summary
+            summary.calories += cal;
+            summary.carbs += carb;
+            summary.protein += prot;
+            summary.fat += fat;
+            summary.sugar += sug;
+
+            // Add to meal group nutrients
+            meals[mType].calories += cal;
+            meals[mType].nutrients.carbs += carb;
+            meals[mType].nutrients.protein += prot;
+            meals[mType].nutrients.fat += fat;
+            meals[mType].nutrients.sugar += sug;
+
+            // Push food item
+            meals[mType].foods.push({
+                id: row.id,
+                foodCode: row.food_code,
+                foodName: row.snap_food_name || null,
+                servings: Number(row.amount),
+                mealTime: row.meal_time,
+                calories: cal,
+                nutrients: {
+                    carbs: carb,
+                    protein: prot,
+                    fat: fat,
+                    sugar: sug
+                },
+                memo: row.memo || null,
+                imageUrl: row.image_url || null
+            });
+        });
+
+        // Round all numbers to 2 decimal places to prevent float math ugliness
+        const roundNutrients = Object.keys(summary).forEach(k => summary[k] = Number(summary[k].toFixed(2)));
+        Object.keys(meals).forEach(mType => {
+            meals[mType].calories = Number(meals[mType].calories.toFixed(2));
+            Object.keys(meals[mType].nutrients).forEach(k => {
+                meals[mType].nutrients[k] = Number(meals[mType].nutrients[k].toFixed(2));
+            });
+        });
+
+        return res.json({
+            success: true,
+            date: date,
+            summary: summary,
+            breakfast: meals.breakfast,
+            lunch: meals.lunch,
+            dinner: meals.dinner,
+            snack: meals.snack
+        });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: err.message });
@@ -100,25 +169,30 @@ router.get("/meal-summary", async (req, res) => {
             return res.status(400).json({ success: false, message: "userId, date, mealType는 필수입니다." });
         }
 
+        // Just fetch the entries and map them to the spec format
         const query = `
-            SELECT 
-                d.meal_type,
-                d.amount,
-                f.food_name, 
-                (f.calories * d.amount) AS total_calories,
-                (f.carbohydrate * d.amount) AS total_carbs,
-                (f.protein * d.amount) AS total_protein,
-                (f.fat * d.amount) AS total_fat,
-                (f.sugars * d.amount) AS total_sugars
-            FROM diary_entries d
-            JOIN foods f ON d.food_code = f.food_code
-            WHERE d.user_id = $1 
-              AND d.meal_type = $2
-              AND DATE(d.meal_time) = $3;
+            SELECT *
+            FROM diary_entries
+            WHERE user_id = $1 
+              AND meal_type = $2
+              AND DATE(meal_time) = $3
         `;
         const result = await pool.query(query, [userId, mealType, date]);
 
-        return res.json({ success: true, count: result.rows.length, data: result.rows });
+        const mappedData = result.rows.map(row => ({
+            mealType: row.meal_type,
+            foodName: row.snap_food_name || "알 수 없는 음식",
+            servings: Number(row.amount),
+            totalCalories: Number(row.snap_calories || 0),
+            nutrients: {
+                carbs: Number(row.snap_carbohydrate || 0),
+                protein: Number(row.snap_protein || 0),
+                fat: Number(row.snap_fat || 0),
+                sugar: Number(row.snap_sugars || 0)
+            }
+        }));
+
+        return res.json({ success: true, count: mappedData.length, data: mappedData });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: err.message });

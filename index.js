@@ -14,7 +14,7 @@ import deficiencyRoutes from "./src/routes/deficiency.routes.js";
 import googleSheetsRoutes from "./src/routes/google_sheets_routes.js";
 import foodsRoutes from "./src/routes/foods_routes.js";
 import scanRoutes from "./src/routes/scan.routes.js";
-import { pool } from "./src/config/db.js";
+// import { pool } from "./src/config/db.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
 
@@ -47,14 +47,14 @@ app.use("/api/google-sheets", googleSheetsRoutes);
 app.use("/api/foods", foodsRoutes);
 app.use("/api/scan", scanRoutes);
 
-app.get("/api/db/ping", async (req, res) => {
-  try {
-    const r = await pool.query("SELECT NOW() as now");
-    res.json({ success: true, data: r.rows[0] });
-  } catch (e) {
-    res.status(500).json({ success: false, error: String(e?.message || e) });
-  }
-});
+// app.get("/api/db/ping", async (req, res) => {
+//   try {
+//     const r = await pool.query("SELECT NOW() as now");
+//     res.json({ success: true, data: r.rows[0] });
+//   } catch (e) {
+//     res.status(500).json({ success: false, error: String(e?.message || e) });
+//   }
+// });
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(50) NOT NULL,
     profile_image_url VARCHAR(255),
+    gender VARCHAR(20),
+    age_group VARCHAR(20),
+    height NUMERIC(5,2),
+    weight NUMERIC(5,2),
+    goals JSONB DEFAULT '[]'::jsonb,
+    dietary_restrictions JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
@@ -121,6 +127,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     snap_cholesterol NUMERIC,
     snap_saturated_fat NUMERIC,
     snap_trans_fat NUMERIC,
+    image_url TEXT,
+    memo TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
