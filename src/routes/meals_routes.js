@@ -106,6 +106,8 @@ router.post("/", async (req, res) => {
             mealType = null,
             eatenAt = null,
             note = null,
+            image = null,
+            memo = null,
         } = req.body;
 
         // 1) 필수값 체크
@@ -206,10 +208,33 @@ router.post("/", async (req, res) => {
 
         const newEntry = result.rows[0];
 
+        // Format to perfectly match requested payload returning structure.
         return res.json({
             success: true,
             message: "식단 입력이 완료되었습니다.",
-            data: newEntry
+            data: {
+                id: newEntry.id,
+                user_id: newEntry.user_id,
+                ai_scan_id: newEntry.ai_scan_id || null, // Ensure explicit null mapping
+                meal_type: newEntry.meal_type,
+                meal_time: newEntry.meal_time,
+                food_code: newEntry.food_code,
+                custom_food_id: newEntry.custom_food_id || null,
+                amount: newEntry.amount,
+                snap_food_name: newEntry.snap_food_name,
+                snap_calories: newEntry.snap_calories,
+                snap_carbohydrate: newEntry.snap_carbohydrate,
+                snap_protein: newEntry.snap_protein,
+                snap_fat: newEntry.snap_fat,
+                snap_sugars: newEntry.snap_sugars,
+                snap_sodium: newEntry.snap_sodium,
+                snap_cholesterol: newEntry.snap_cholesterol,
+                snap_saturated_fat: newEntry.snap_saturated_fat,
+                snap_trans_fat: newEntry.snap_trans_fat,
+                created_at: newEntry.created_at,
+                updated_at: newEntry.updated_at,
+                deleted_at: newEntry.deleted_at || null
+            }
         });
 
     } catch (err) {
