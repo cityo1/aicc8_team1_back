@@ -15,5 +15,6 @@ const upload = multer({
 });
 
 router.post('/food', upload.single('image'), scanController.analyzeFood);
+router.post('/food/reanalyze', express.json(), scanController.reanalyzeFood);
 
 export default router;
