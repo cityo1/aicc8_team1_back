@@ -14,7 +14,7 @@ import deficiencyRoutes from './src/routes/deficiency.routes.js';
 import googleSheetsRoutes from './src/routes/google_sheets_routes.js';
 import foodsRoutes from './src/routes/foods_routes.js';
 import scanRoutes from './src/routes/scan.routes.js';
-import { pool } from './src/config/db.js';
+// import { pool } from './src/config/db.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/config/swagger.js';
 import recommendRoutes from './src/routes/recommendRoutes.js';

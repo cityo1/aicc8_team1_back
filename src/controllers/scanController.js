@@ -23,6 +23,89 @@ const PROMPT = `이 이미지에 담긴 음식을 분석해서, 각 음식별로
 - sugars: 당류 (g)
 예상치를 합리적으로 추정해주세요. bbox는 각 음식/음료가 이미지에서 차지하는 대략적인 영역을 추정해주세요.`;
 
+const REANALYZE_PROMPT = `사용자가 수정한 음식 목록과 그램수에 맞춰 각 음식의 영양정보를 재계산해주세요.
+반드시 아래 형식의 JSON 배열만 출력하세요. 다른 텍스트 없이 JSON만 출력하세요.
+[
+  { "name": "음식명", "amount": 숫자, "calories": 숫자, "carbohydrate": 숫자, "protein": 숫자, "fat": 숫자, "sodium": 숫자, "sugars": 숫자 },
+  ...
+]
+- name: 음식명 (입력과 동일하게)
+- amount: 그램수 (입력과 동일하게)
+- calories: 해당 그램수 기준 칼로리 (kcal)
+- carbohydrate: 탄수화물 (g)
+- protein: 단백질 (g)
+- fat: 지방 (g)
+- sodium: 나트륨 (mg)
+- sugars: 당류 (g)
+각 음식의 일반적인 영양밀도를 고려하여 주어진 그램수에 맞는 영양소를 추정해주세요.
+입력된 음식 순서대로 JSON 배열을 반환해주세요.`;
+
+/**
+ * POST /api/scan/food/reanalyze - 수정된 음식량으로 AI 재분석
+ * req.body: { foods: [{ name: string, amount: number }, ...] }
+ */
+export async function reanalyzeFood(req, res) {
+  try {
+    const { foods: inputFoods } = req.body || {};
+    if (!Array.isArray(inputFoods) || inputFoods.length === 0) {
+      return res.status(400).json({
+        message: 'foods 배열을 보내주세요. 예: { "foods": [{ "name": "김치찌개", "amount": 300 }] }',
+      });
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        message: 'OPENAI_API_KEY가 설정되지 않았습니다. .env를 확인해주세요.',
+      });
+    }
+
+    const foodListStr = inputFoods
+      .map((f) => `- ${String(f.name || '').trim() || '음식'}: ${Number(f.amount) || 0}g`)
+      .join('\n');
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: `${REANALYZE_PROMPT}\n\n수정된 음식 목록:\n${foodListStr}`,
+        },
+      ],
+      max_tokens: 1024,
+    });
+
+    const text = completion.choices[0]?.message?.content?.trim() || '[]';
+    let foods = [];
+    try {
+      const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
+      foods = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('AI 재분석 응답 파싱 실패:', text);
+      return res
+        .status(500)
+        .json({ message: 'AI 재분석 결과를 파싱할 수 없습니다.', raw: text });
+    }
+
+    if (!Array.isArray(foods)) foods = [];
+    const totalCalories = foods.reduce(
+      (sum, f) => sum + (Number(f.calories) || 0),
+      0
+    );
+
+    res.json({
+      success: true,
+      foods,
+      totalCalories: Math.round(totalCalories),
+    });
+  } catch (err) {
+    console.error(err);
+    const msg = err?.message || '서버 오류';
+    if (msg.includes('API key')) {
+      return res.status(401).json({ message: 'OpenAI API 키가 유효하지 않습니다.' });
+    }
+    res.status(500).json({ message: msg });
+  }
+}
+
 /**
  * POST /api/scan/food - 식사 사진 업로드 → AI 영양 분석
  * req.file: multer로 수신한 이미지 (buffer)

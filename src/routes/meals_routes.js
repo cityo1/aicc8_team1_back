@@ -75,11 +75,12 @@ router.get("/search", async (req, res) => {
  *             type: object
  *             required:
  *               - userId
- *               - foodCode
  *             properties:
  *               userId:
  *                 type: string
  *               foodCode:
+ *                 type: string
+ *               foodName:
  *                 type: string
  *               servings:
  *                 type: number
@@ -101,10 +102,12 @@ router.post("/", async (req, res) => {
         const {
             userId,
             foodCode,
+            foodName = null,
             servings = 1,
             mealType = null,
-            eatenAt = null,
-            note = null,
+            mealTime = null,
+            memo = null,
+            imageUrl = null,
         } = req.body;
 
         // 1) 필수값 체크
@@ -129,88 +132,112 @@ router.post("/", async (req, res) => {
         // 4) UUID 생성 (DB에서 안 만들고 Node에서 만듦)
         const id = uuidv4();
 
-        // 5) INSERT into diary_entries
+        // 5) foods 테이블에서 영양소 정보 가져오기
+        const foodRes = await pool.query(
+            `SELECT food_name, calories, carbohydrate, protein, fat, sugars, sodium, cholesterol, saturated_fat, trans_fat 
+             FROM foods 
+             WHERE food_code = $1`,
+            [foodCode]
+        );
+
+        let snapData = {
+            snap_food_name: foodName,
+            snap_calories: null,
+            snap_carbohydrate: null,
+            snap_protein: null,
+            snap_fat: null,
+            snap_sugars: null,
+            snap_sodium: null,
+            snap_cholesterol: null,
+            snap_saturated_fat: null,
+            snap_trans_fat: null
+        };
+
+        if (foodRes.rows.length > 0) {
+            const food = foodRes.rows[0];
+            // 제공량(servings)을 곱해서 snap_* 에 넣습니다.
+            snapData = {
+                snap_food_name: foodName || food.food_name || null,
+                snap_calories: food.calories != null ? (Number(food.calories) * s) : null,
+                snap_carbohydrate: food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null,
+                snap_protein: food.protein != null ? (Number(food.protein) * s) : null,
+                snap_fat: food.fat != null ? (Number(food.fat) * s) : null,
+                snap_sugars: food.sugars != null ? (Number(food.sugars) * s) : null,
+                snap_sodium: food.sodium != null ? (Number(food.sodium) * s) : null,
+                snap_cholesterol: food.cholesterol != null ? (Number(food.cholesterol) * s) : null,
+                snap_saturated_fat: food.saturated_fat != null ? (Number(food.saturated_fat) * s) : null,
+                snap_trans_fat: food.trans_fat != null ? (Number(food.trans_fat) * s) : null
+            };
+        }
+
+        // 6) INSERT into diary_entries (가져온 영양소 값 포함)
         const result = await pool.query(
-            `INSERT INTO diary_entries (id, user_id, food_code, meal_type, amount, meal_time)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, NOW()))
-       RETURNING *`,
-            [id, userId, foodCode, mealType, s, eatenAt]
+            `INSERT INTO diary_entries (
+                id, user_id, food_code, meal_type, amount, meal_time,
+                snap_food_name, snap_calories, snap_carbohydrate, snap_protein, 
+                snap_fat, snap_sugars, snap_sodium, snap_cholesterol, snap_saturated_fat, snap_trans_fat,
+                image_url, memo,
+                created_at, updated_at
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, 
+                COALESCE($6::timestamptz, NOW()), 
+                $7, $8, $9, $10, 
+                $11, $12, $13, $14, $15, $16,
+                $17, $18,
+                NOW(), NOW()
+            )
+            RETURNING *`,
+            [
+                id,
+                userId,
+                foodCode,
+                mealType,
+                s,
+                mealTime,
+                snapData.snap_food_name,
+                snapData.snap_calories,
+                snapData.snap_carbohydrate,
+                snapData.snap_protein,
+                snapData.snap_fat,
+                snapData.snap_sugars,
+                snapData.snap_sodium,
+                snapData.snap_cholesterol,
+                snapData.snap_saturated_fat,
+                snapData.snap_trans_fat,
+                imageUrl,
+                memo
+            ]
         );
 
         const newEntry = result.rows[0];
 
-        // 6) Calculate total nutrition and upsert daily_summaries
-        // 6-1) Fetch food nutrition details
-        const foodResult = await pool.query(
-            `SELECT calories, carbohydrate, protein, fat, sugars 
-             FROM foods WHERE food_code = $1`,
-            [foodCode]
-        );
-
-        let dailySummary = null;
-
-        if (foodResult.rows.length > 0) {
-            const food = foodResult.rows[0];
-
-            // Calculate intake based on servings
-            const addCalories = (Number(food.calories) || 0) * s;
-            const addCarbs = (Number(food.carbohydrate) || 0) * s;
-            const addProtein = (Number(food.protein) || 0) * s;
-            const addFat = (Number(food.fat) || 0) * s;
-            const addSugars = (Number(food.sugars) || 0) * s;
-
-            // Determine the date for the summary
-            const targetDate = eatenAt ? new Date(eatenAt).toISOString().split('T')[0] : 'CURRENT_DATE';
-            const dateStr = targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : `$7`;
-
-            const upsertParams = [
-                uuidv4(), // id for new summary
-                userId,
-                addCalories,
-                addCarbs,
-                addProtein,
-                addFat,
-                addSugars
-            ];
-
-            if (targetDate !== 'CURRENT_DATE') {
-                upsertParams.push(targetDate);
-            }
-
-            // 6-2) Upsert daily_summaries
-            const upsertQuery = `
-                INSERT INTO daily_summaries (
-                    id, user_id, summary_date, 
-                    total_calories, total_carbohydrate, total_protein, total_fat, total_sugars,
-                    created_at, updated_at
-                )
-                VALUES (
-                    $1, $2, ${dateStr}, 
-                    $3, $4, $5, $6, $7,
-                    NOW(), NOW()
-                )
-                ON CONFLICT (user_id, summary_date)
-                DO UPDATE SET
-                    total_calories = COALESCE(daily_summaries.total_calories, 0) + EXCLUDED.total_calories,
-                    total_carbohydrate = COALESCE(daily_summaries.total_carbohydrate, 0) + EXCLUDED.total_carbohydrate,
-                    total_protein = COALESCE(daily_summaries.total_protein, 0) + EXCLUDED.total_protein,
-                    total_fat = COALESCE(daily_summaries.total_fat, 0) + EXCLUDED.total_fat,
-                    total_sugars = COALESCE(daily_summaries.total_sugars, 0) + EXCLUDED.total_sugars,
-                    updated_at = NOW()
-                RETURNING *;
-            `;
-
-            const summaryResult = await pool.query(upsertQuery, upsertParams);
-            dailySummary = summaryResult.rows[0];
-        }
-
+        // Format to perfectly match requested payload returning structure.
         return res.json({
             success: true,
-            data: newEntry,
-            dailySummary: dailySummary
+            message: "식단 입력이 완료되었습니다.",
+            data: {
+                id: newEntry.id,
+                userId: newEntry.user_id,
+                foodCode: newEntry.food_code,
+                foodName: newEntry.snap_food_name || null,
+                mealType: newEntry.meal_type,
+                servings: Number(newEntry.amount),
+                mealTime: newEntry.meal_time,
+                calories: newEntry.snap_calories != null ? Number(newEntry.snap_calories) : null,
+                nutrients: {
+                    carbs: newEntry.snap_carbohydrate != null ? Number(newEntry.snap_carbohydrate) : null,
+                    protein: newEntry.snap_protein != null ? Number(newEntry.snap_protein) : null,
+                    fat: newEntry.snap_fat != null ? Number(newEntry.snap_fat) : null,
+                    sugar: newEntry.snap_sugars != null ? Number(newEntry.snap_sugars) : null
+                },
+                memo: newEntry.memo || null,
+                imageUrl: newEntry.image_url || null
+            }
         });
+
     } catch (err) {
-        console.error(err);
+        console.error("Meal POST error:", err);
         // Foreign key violation check (e.g. food_code not found in foods table)
         if (err.code === '23503') {
             return res.status(400).json({
