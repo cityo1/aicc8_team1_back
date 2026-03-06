@@ -42,16 +42,16 @@ const findUserByNickname = async (nickname) => {
  * @param {string} nickname
  * @returns {Promise<Object>}
  */
-const createUser = async (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions) => {
-    // 트랜잭션을 사용하여 users와 user_settings 테이블에 동시 삽입
+const createUser = async (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, receive_notifications, eating_habits, allergies) => {
+    // 단일 테이블(users)에 모든 정보 삽입
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
         const insertUserQuery = `
-            INSERT INTO users (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING id, email, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, created_at;
+            INSERT INTO users (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, receive_notifications, eating_habits, allergies)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id, email, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, receive_notifications, eating_habits, allergies, created_at;
         `;
         const userValues = [
             id, email, password_hash, nickname, profile_image_url || null,
@@ -60,16 +60,13 @@ const createUser = async (id, email, password_hash, nickname, profile_image_url,
             height || null,
             weight || null,
             goals ? JSON.stringify(goals) : '[]',
-            dietary_restrictions ? JSON.stringify(dietary_restrictions) : '[]'
+            dietary_restrictions ? JSON.stringify(dietary_restrictions) : '[]',
+            receive_notifications !== undefined ? receive_notifications : true,
+            eating_habits || null,
+            allergies ? (Array.isArray(allergies) ? allergies : [allergies]) : null
         ];
         const userResult = await client.query(insertUserQuery, userValues);
         const newUser = userResult.rows[0];
-
-        const insertSettingsQuery = `
-            INSERT INTO user_settings (user_id)
-            VALUES ($1);
-        `;
-        await client.query(insertSettingsQuery, [newUser.id]);
 
         await client.query('COMMIT');
         return newUser;

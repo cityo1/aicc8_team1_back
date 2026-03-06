@@ -19,7 +19,8 @@ const signup = async (req, res) => {
     try {
         const {
             email, password, nickname, profile_image_url,
-            gender, age_group, height, weight, goals, dietary_restrictions
+            gender, age_group, height, weight, goals, dietary_restrictions,
+            receive_notifications, eating_habits, allergies
         } = req.body;
 
         // 필수 값 검증
@@ -43,7 +44,8 @@ const signup = async (req, res) => {
         // 사용자 생성 (DB 저장)
         const newUser = await createUser(
             userId, email, passwordHash, nickname, profile_image_url,
-            gender, age_group, height, weight, goals, dietary_restrictions
+            gender, age_group, height, weight, goals, dietary_restrictions,
+            receive_notifications, eating_habits, allergies
         );
 
         // 비밀번호 해시 제외 후 반환
@@ -60,6 +62,9 @@ const signup = async (req, res) => {
                 weight: newUser.weight,
                 goals: newUser.goals,
                 dietaryRestrictions: newUser.dietary_restrictions,
+                receiveNotifications: newUser.receive_notifications,
+                eatingHabits: newUser.eating_habits,
+                allergies: newUser.allergies,
                 createdAt: newUser.created_at
             }
         });
