@@ -43,44 +43,23 @@ const findUserByNickname = async (nickname) => {
  * @returns {Promise<Object>}
  */
 const createUser = async (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions) => {
-    // 트랜잭션을 사용하여 users와 user_settings 테이블에 동시 삽입
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        const insertUserQuery = `
-            INSERT INTO users (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING id, email, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, created_at;
-        `;
-        const userValues = [
-            id, email, password_hash, nickname, profile_image_url || null,
-            gender || null,
-            age_group || null,
-            height || null,
-            weight || null,
-            goals ? JSON.stringify(goals) : '[]',
-            dietary_restrictions ? JSON.stringify(dietary_restrictions) : '[]'
-        ];
-        const userResult = await client.query(insertUserQuery, userValues);
-        const newUser = userResult.rows[0];
-
-        const insertSettingsQuery = `
-            INSERT INTO user_settings (user_id)
-            VALUES ($1);
-        `;
-        await client.query(insertSettingsQuery, [newUser.id]);
-
-        await client.query('COMMIT');
-        return newUser;
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error("createUser 에러:", error);
-        throw error;
-    } finally {
-        client.release();
-    }
-};
+    const insertUserQuery = `
+        INSERT INTO users (id, email, password_hash, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING id, email, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions, created_at;
+    `;
+    const userValues = [
+        id, email, password_hash, nickname, profile_image_url || null,
+        gender || null,
+        age_group || null,
+        height || null,
+        weight || null,
+        goals ? JSON.stringify(goals) : '[]',
+        dietary_restrictions ? JSON.stringify(dietary_restrictions) : '[]'
+    ];
+    const userResult = await pool.query(insertUserQuery, userValues);
+    return userResult.rows[0];
+}
 
 /**
  * 비밀번호 재설정 인증 코드 저장

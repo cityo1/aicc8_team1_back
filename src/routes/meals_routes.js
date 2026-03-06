@@ -173,7 +173,7 @@ router.post("/", async (req, res) => {
         // 6) INSERT into diary_entries (가져온 영양소 값 포함)
         const result = await pool.query(
             `INSERT INTO diary_entries (
-                id, user_id, food_code, meal_type, amount, meal_time,
+                id, user_id, food_code, meal_type, serving_size, meal_time,
                 snap_food_name, snap_calories, snap_carbohydrate, snap_protein, 
                 snap_fat, snap_sugars, snap_sodium, snap_cholesterol, snap_saturated_fat, snap_trans_fat,
                 image_url, memo,
@@ -222,7 +222,7 @@ router.post("/", async (req, res) => {
                 foodCode: newEntry.food_code,
                 foodName: newEntry.snap_food_name || null,
                 mealType: newEntry.meal_type,
-                servings: Number(newEntry.amount),
+                servings: Number(newEntry.serving_size),
                 mealTime: newEntry.meal_time,
                 calories: newEntry.snap_calories != null ? Number(newEntry.snap_calories) : null,
                 nutrients: {
