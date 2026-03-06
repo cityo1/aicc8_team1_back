@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../config/db.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -193,12 +194,10 @@ router.get('/meal-summary', async (req, res) => {
     const { userId, date, mealType } = req.query;
 
     if (!userId || !date || !mealType) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'userId, date, mealType는 필수입니다.',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'userId, date, mealType는 필수입니다.',
+      });
     }
 
     // Just fetch the entries and map them to the spec format
@@ -231,6 +230,110 @@ router.get('/meal-summary', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/diary/scan
+ * AI 식단 분석 결과를 diary_entries에 저장 (ai_scans + diary_entries)
+ * req.body: { userId, mealType, mealTime, imageUrl, foods: [{ name, amount, calories, carbohydrate, protein, fat, sugars }] }
+ */
+router.post('/scan', async (req, res) => {
+  try {
+    const {
+      userId,
+      mealType = 'snack',
+      mealTime = null,
+      imageUrl = null,
+      foods = [],
+    } = req.body;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'userId는 필수입니다.' });
+    }
+    if (!Array.isArray(foods) || foods.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'foods 배열은 비어있을 수 없습니다.',
+      });
+    }
+
+    const allowedMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+    if (!allowedMealTypes.includes(mealType)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'mealType은 breakfast, lunch, dinner, snack 중 하나여야 합니다.',
+      });
+    }
+
+    const mealTimestamp = mealTime ? new Date(mealTime) : new Date();
+    const aiScanId = uuidv4();
+
+    // 1) ai_scans INSERT
+    const scanResult = foods.map((f) => ({
+      name: f.name,
+      amount: Number(f.amount) || 0,
+      calories: Number(f.calories) || 0,
+      carbohydrate: Number(f.carbohydrate) || 0,
+      protein: Number(f.protein) || 0,
+      fat: Number(f.fat) || 0,
+      sugars: Number(f.sugars) || 0,
+    }));
+
+    await pool.query(
+      `INSERT INTO ai_scans (id, user_id, image_url, scan_result, status)
+       VALUES ($1, $2, $3, $4, 'COMPLETED')`,
+      [aiScanId, userId, '', JSON.stringify(scanResult)],
+    );
+
+    // 2) diary_entries INSERT (음식별 1행)
+    const insertedIds = [];
+    for (const f of foods) {
+      const entryId = uuidv4();
+      const name = String(f.name ?? '').trim() || '알 수 없는 음식';
+      const amount = Math.max(0, Number(f.amount) || 0);
+      const calories = Number(f.calories) || 0;
+      const carb = Number(f.carbohydrate) || 0;
+      const protein = Number(f.protein) || 0;
+      const fat = Number(f.fat) || 0;
+      const sugars = Number(f.sugars) || 0;
+
+      await pool.query(
+        `INSERT INTO diary_entries (
+          id, user_id, meal_type, meal_time,
+          serving_size, snap_food_name, snap_calories, snap_carbohydrate,
+          snap_protein, snap_fat, snap_sugars, image_url,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
+        [
+          entryId,
+          userId,
+          mealType,
+          mealTimestamp,
+          amount,
+          name,
+          calories,
+          carb,
+          protein,
+          fat,
+          sugars,
+          imageUrl,
+        ],
+      );
+      insertedIds.push(entryId);
+    }
+
+    return res.json({
+      success: true,
+      message: 'AI 식단 분석 기록이 저장되었습니다.',
+      data: { aiScanId, diaryEntryIds: insertedIds },
+    });
+  } catch (err) {
+    console.error('Diary scan save error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
