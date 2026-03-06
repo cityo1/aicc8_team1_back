@@ -70,11 +70,6 @@ CREATE TABLE IF NOT EXISTS foods (
     cholesterol NUMERIC,
     saturated_fat NUMERIC,
     trans_fat NUMERIC,
-    calcium NUMERIC,
-    iron NUMERIC,
-    potassium NUMERIC,
-    vitamin_a NUMERIC,
-    vitamin_c NUMERIC,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
