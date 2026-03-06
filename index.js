@@ -4,6 +4,11 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import mealsRoutes from "./src/routes/meals_routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
@@ -20,6 +25,9 @@ import swaggerSpec from "./src/config/swagger.js";
 
 
 const app = express();
+
+// Set uploads directory as static route
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // test
 
