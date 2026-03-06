@@ -18,7 +18,7 @@ import { sendVerificationEmail } from "../services/emailService.js";
 const signup = async (req, res) => {
     try {
         const {
-            email, password, nickname,
+            email, password, nickname, profile_image_url,
             gender, age_group, height, weight, goals, dietary_restrictions
         } = req.body;
 
@@ -42,7 +42,7 @@ const signup = async (req, res) => {
 
         // 사용자 생성 (DB 저장)
         const newUser = await createUser(
-            userId, email, passwordHash, nickname,
+            userId, email, passwordHash, nickname, profile_image_url,
             gender, age_group, height, weight, goals, dietary_restrictions
         );
 
@@ -53,6 +53,7 @@ const signup = async (req, res) => {
                 id: newUser.id,
                 email: newUser.email,
                 nickname: newUser.nickname,
+                profileImageUrl: newUser.profile_image_url,
                 gender: newUser.gender,
                 ageGroup: newUser.age_group,
                 height: newUser.height,

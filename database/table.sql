@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS foods CASCADE;
 DROP TABLE IF EXISTS user_settings CASCADE;
 DROP TABLE IF EXISTS favorites CASCADE;
 DROP TABLE IF EXISTS meal_logs CASCADE;
+DROP TABLE IF EXISTS password_resets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- ✅ 확장 설치 불가 환경: DB에서 UUID 자동생성하지 않음
@@ -28,8 +29,23 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(50) NOT NULL,
     profile_image_url VARCHAR(255),
+    gender VARCHAR(20),
+    age_group VARCHAR(20),
+    height NUMERIC(5,2),
+    weight NUMERIC(5,2),
+    goals JSONB DEFAULT '[]'::jsonb,
+    dietary_restrictions JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
+);
+
+-- 1.5. password_resets (비밀번호 재설정)
+CREATE TABLE IF NOT EXISTS password_resets (
+    email VARCHAR(255) PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+    code VARCHAR(10),
+    reset_token VARCHAR(255),
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 2. user_settings (사용자 설정) 1:1
@@ -60,11 +76,6 @@ CREATE TABLE IF NOT EXISTS foods (
     cholesterol NUMERIC,
     saturated_fat NUMERIC,
     trans_fat NUMERIC,
-    calcium NUMERIC,
-    iron NUMERIC,
-    potassium NUMERIC,
-    vitamin_a NUMERIC,
-    vitamin_c NUMERIC,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -116,6 +127,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     snap_cholesterol NUMERIC,
     snap_saturated_fat NUMERIC,
     snap_trans_fat NUMERIC,
+    image_url TEXT,
+    memo TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
@@ -248,19 +261,6 @@ CREATE TABLE IF NOT EXISTS community_reports (
     resolved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (post_id, user_id)
-);
-
--- 16. meal_food_items (식단 음식 항목) meal_logs 1:N
-CREATE TABLE meal_food_items (
-    item_id         SERIAL PRIMARY KEY,
-    meal_log_id     UUID NOT NULL REFERENCES meal_logs(id) ON DELETE CASCADE,
-    food_code       VARCHAR(50) NOT NULL REFERENCES foods(food_code),
-    amount_g        NUMERIC(6,2) NOT NULL DEFAULT 100,  -- 섭취량 (g)
-    item_calories   NUMERIC(7,2),                       -- 해당 음식의 칼로리
-    item_carbs      NUMERIC(6,2),
-    item_protein    NUMERIC(6,2),
-    item_fat        NUMERIC(6,2),
-    item_sugar      NUMERIC(6,2)
 );
 
 -- ✅ 생성 확인용
