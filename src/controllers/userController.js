@@ -5,17 +5,15 @@ import crypto from "crypto";
 import {
     findUserByEmail, findUserByNickname, createUser,
     savePasswordResetCode, findPasswordResetInfo,
-    savePasswordResetToken, updateUserPassword
+    savePasswordResetToken, updateUserPassword,
+    findUserById, updateProfile, deleteUser
 } from "../models/userModel.js";
 import { sendVerificationEmail } from "../services/emailService.js";
-
-
-
-
 
 // require('dotenv').config(); // Removed for ES module compatibility/redundancy
 
 const signup = async (req, res) => {
+    // ... existing code ...
     try {
         const {
             email, password, nickname, profile_image_url,
@@ -135,7 +133,7 @@ const login = async (req, res) => {
         res.status(500).json({ message: "서버 내부 오류가 발생했습니다." });
     }
 };
-// login 함수 끝난 다음 줄에 그대로 붙여넣기
+
 const refresh = async (req, res) => {
     try {
         const token = req.cookies.refreshToken;
@@ -165,7 +163,9 @@ const refresh = async (req, res) => {
 const logout = async (req, res) => {
     res.clearCookie("refreshToken", { httpOnly: true, sameSite: "lax", secure: false });
     return res.status(200).json({ message: "로그아웃 완료" });
-}; const getUsers = async (req, res) => {
+};
+
+const getUsers = async (req, res) => {
     try {
         res.status(200).json({ message: "Get users success (placeholder)" });
     } catch (error) {
@@ -173,7 +173,6 @@ const logout = async (req, res) => {
     }
 };
 
-// Step 0: 이메일 입력 → 인증 코드 발송 / 재전송 (동일 로직)
 const sendPasswordResetCode = async (req, res) => {
     try {
         const { email } = req.body;
@@ -197,7 +196,7 @@ const sendPasswordResetCode = async (req, res) => {
     }
 };
 
-// Step 1: 인증 코드 검증 → 토큰 발급
+
 const verifyPasswordResetCode = async (req, res) => {
     try {
         const { email, code } = req.body;
@@ -228,7 +227,7 @@ const verifyPasswordResetCode = async (req, res) => {
     }
 };
 
-// Step 2: 새 비밀번호 설정
+
 const resetPassword = async (req, res) => {
     try {
         const { resetToken, newPassword } = req.body;
@@ -236,8 +235,6 @@ const resetPassword = async (req, res) => {
             return res.status(400).json({ message: "재설정 토큰과 새 비밀번호를 입력해주세요." });
         }
 
-        // 모든 password_resets 조회 (토큰을 기반으로 사용자 찾기 위해)
-        // 실제로는 토큰으로 조회하는 함수를 만들면 더 좋으나, 코드를 간단하게 하기 위해 클라이언트에서 받는다고 가정하거나, 토큰으로 DB 조회.
         const poolQuery = await import("../config/db.js");
         const { rows } = await poolQuery.pool.query('SELECT * FROM password_resets WHERE reset_token = $1', [resetToken]);
 
@@ -262,6 +259,127 @@ const resetPassword = async (req, res) => {
     }
 };
 
+/**
+ * [GET] 사용자 정보 조회
+ */
+const getMyProfile = async (req, res) => {
+    try {
+        const userId = req.user?.id; // 인증 미들웨어(requireAuth)를 통해 주입됨 
+
+        if (!userId) {
+            // 인증 미들웨어가 없다면, 쿼리파라미터나 헤더 등에서 임시로 받을 수 있음 (예: req.query.userId)
+            return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+
+        const user = await findUserById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "사용자를 찾을 수 없습니다." });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                nickname: user.nickname,
+                profileImageUrl: user.profile_image_url || null,
+                gender: user.gender || null,
+                ageGroup: user.age_group || null,
+                height: user.height || null,
+                weight: user.weight || null,
+                goals: user.goals ? (typeof user.goals === 'string' ? JSON.parse(user.goals) : user.goals) : [],
+                dietaryRestrictions: user.dietary_restrictions ? (typeof user.dietary_restrictions === 'string' ? JSON.parse(user.dietary_restrictions) : user.dietary_restrictions) : []
+            }
+        });
+
+    } catch (error) {
+        console.error("getMyProfile 에러:", error);
+        res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
+    }
+};
+
+/**
+ * [PUT] 사용자 정보 수정
+ */
+const updateMyProfile = async (req, res) => {
+    try {
+        const userId = req.user?.id; // 인증 미들웨어를 통해 주입
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+
+        const {
+            nickname,
+            profileImageUrl,
+            height,
+            weight,
+            goals,
+            dietaryRestrictions
+        } = req.body;
+
+        const updatedUser = await updateProfile(userId, {
+            nickname,
+            profileImageUrl,
+            height,
+            weight,
+            goals,
+            dietaryRestrictions
+        });
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "사용자를 찾을 수 없습니다." });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "수정되었습니다.",
+            data: {
+                id: updatedUser.id,
+                nickname: updatedUser.nickname,
+                profileImageUrl: updatedUser.profile_image_url || null,
+                height: updatedUser.height || null,
+                weight: updatedUser.weight || null,
+                goals: updatedUser.goals ? (typeof updatedUser.goals === 'string' ? JSON.parse(updatedUser.goals) : updatedUser.goals) : [],
+                dietaryRestrictions: updatedUser.dietary_restrictions ? (typeof updatedUser.dietary_restrictions === 'string' ? JSON.parse(updatedUser.dietary_restrictions) : updatedUser.dietary_restrictions) : []
+            }
+        });
+
+    } catch (error) {
+        console.error("updateMyProfile 에러:", error);
+        res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
+    }
+};
+
+/**
+ * [DELETE] 회원 탈퇴
+ */
+const withdrawUser = async (req, res) => {
+    try {
+        const userId = req.user?.id; // 인증 미들웨어를 통해 주입
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+
+        const result = await deleteUser(userId);
+        if (!result) {
+            return res.status(404).json({ success: false, message: "사용자를 찾을 수 없습니다." });
+        }
+
+        // 쿠키를 이용해 로그아웃(토큰 삭제) 처리도 병행
+        res.clearCookie("refreshToken", { httpOnly: true, sameSite: "lax", secure: false });
+
+        return res.status(200).json({
+            success: true,
+            message: "회원탈퇴가 완료되었습니다."
+        });
+
+    } catch (error) {
+        console.error("withdrawUser 에러:", error);
+        res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
+    }
+};
+
+
 export default {
     signup,
     login,
@@ -271,5 +389,8 @@ export default {
     sendPasswordResetCode,
     verifyPasswordResetCode,
     resetPassword,
-    resendPasswordResetCode: sendPasswordResetCode // Step 0 함수 재사용
+    resendPasswordResetCode: sendPasswordResetCode,
+    getMyProfile,
+    updateMyProfile,
+    withdrawUser
 };

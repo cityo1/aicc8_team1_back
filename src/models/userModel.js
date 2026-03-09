@@ -160,6 +160,81 @@ const updateUserPassword = async (email, newPasswordHash) => {
   }
 };
 
+/**
+ * ID로 사용자 조회
+ * @param {string} id
+ * @returns {Promise<Object>}
+ */
+const findUserById = async (id) => {
+  const query = 'SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL';
+  const values = [id];
+  try {
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  } catch (error) {
+    console.error('findUserById 에러:', error);
+    throw error;
+  }
+};
+
+/**
+ * 사용자 정보 업데이트
+ */
+const updateProfile = async (id, updateData) => {
+  const { nickname, profileImageUrl, height, weight, goals, dietaryRestrictions } = updateData;
+
+  const query = `
+    UPDATE users 
+    SET 
+        nickname = COALESCE($1, nickname),
+        profile_image_url = COALESCE($2, profile_image_url),
+        height = COALESCE($3, height),
+        weight = COALESCE($4, weight),
+        goals = COALESCE($5, goals),
+        dietary_restrictions = COALESCE($6, dietary_restrictions),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $7 AND deleted_at IS NULL
+    RETURNING id, nickname, profile_image_url, gender, age_group, height, weight, goals, dietary_restrictions
+  `;
+
+  const values = [
+    nickname,
+    profileImageUrl,
+    height,
+    weight,
+    goals ? JSON.stringify(goals) : null,
+    dietaryRestrictions ? JSON.stringify(dietaryRestrictions) : null,
+    id
+  ];
+
+  try {
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+  } catch (error) {
+    console.error('updateProfile 에러:', error);
+    throw error;
+  }
+};
+
+/**
+ * 탈퇴(소프트 삭제: deleted_at 설정)
+ */
+const deleteUser = async (id) => {
+  const query = `
+    UPDATE users 
+    SET deleted_at = CURRENT_TIMESTAMP 
+    WHERE id = $1 AND deleted_at IS NULL
+    RETURNING id
+  `;
+  try {
+    const { rows } = await pool.query(query, [id]);
+    return rows[0];
+  } catch (error) {
+    console.error('deleteUser 에러:', error);
+    throw error;
+  }
+};
+
 export {
   findUserByEmail,
   findUserByNickname,
@@ -168,4 +243,7 @@ export {
   findPasswordResetInfo,
   savePasswordResetToken,
   updateUserPassword,
+  findUserById,
+  updateProfile,
+  deleteUser,
 };

@@ -19,6 +19,7 @@ import deficiencyRoutes from "./src/routes/deficiency.routes.js";
 import googleSheetsRoutes from "./src/routes/google_sheets_routes.js";
 import foodsRoutes from "./src/routes/foods_routes.js";
 import scanRoutes from "./src/routes/scan.routes.js";
+import notificationsRouter, { settingsRouter } from "./src/routes/notifications.routes.js";
 // import { pool } from "./src/config/db.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./src/config/swagger.js";
@@ -49,11 +50,13 @@ app.use("/api/meals", mealsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/mfds", mfdsRoutes);
 app.use("/api/diary", diaryRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes); // /api/users 경로
+app.use("/api/users", settingsRouter); // /api/users/me/notification-settings 매핑
 app.use("/api/deficiency", deficiencyRoutes);
 app.use("/api/google-sheets", googleSheetsRoutes);
 app.use("/api/foods", foodsRoutes);
 app.use("/api/scan", scanRoutes);
+app.use("/api/notifications", notificationsRouter);
 
 // app.get("/api/db/ping", async (req, res) => {
 //   try {
