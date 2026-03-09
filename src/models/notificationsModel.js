@@ -48,6 +48,24 @@ export const markNotificationAsRead = async (notificationId, userId) => {
 };
 
 /**
+ * 알림 환경설정 조회
+ */
+export const getNotificationSettings = async (userId) => {
+    const query = `
+    SELECT receive_notifications
+    FROM users
+    WHERE id = $1 AND deleted_at IS NULL
+  `;
+    try {
+        const { rows } = await pool.query(query, [userId]);
+        return rows[0];
+    } catch (error) {
+        console.error('getNotificationSettings 에러:', error);
+        throw error;
+    }
+};
+
+/**
  * 알림 환경설정 업데이트 (users 테이블의 receive_notifications 컬럼 등 활용)
  */
 export const updateNotificationSettings = async (userId, receiveNotifications) => {
