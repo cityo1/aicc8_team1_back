@@ -1,130 +1,66 @@
+import { pool } from '../config/db.js';
 import OpenAI from 'openai';
-import { pool } from '../config/db.js'; // DB 연결 설정 임포트
+import dotenv from 'dotenv';
+dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const FILTER_TAGS = ['고단백', '다이어트', '비건', '저탄수', '0kcal', '저당'];
 
-// 1. 초기 음식 카드 랜덤하게 가져오기 - 페이지 진입 시 DB의 전체 음식 중 랜덤으로 6개를 추출합니다.
-export async function getRandomFoods(req, res) {
+export const getChatRecommendation = async (req, res) => {
   try {
-    // PostgreSQL 기준 RANDOM() 함수를 사용하여 무작위 6개 추출
-    const query = `
-      SELECT id, name, tags, image_url AS image 
-      FROM foods
-      ORDER BY RANDOM() 
-      LIMIT 6
-    `;
-    const result = await pool.query(query);
+    const { inputMessage, messages, userNutrients } = req.body;
 
-    res.json({
-      success: true,
-      foods: result.rows,
-    });
-  } catch (err) {
-    console.error('랜덤 데이터 로드 실패:', err);
-    res.status(500).json({
-      success: false,
-      message: '초기 식단 로드 중 오류가 발생했습니다.',
-    });
-  }
-}
-
-// * 2. AI 챗봇 추천 (DB 검색 연동) - AI가 추천한 메뉴명을 바탕으로 DB에서 실제 정보를 조회하여 반환합니다.
-export async function getAiRecommendation(req, res) {
-  try {
-    const { messages, inputMessage } = req.body;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    // 1. OpenAI: 다중 키워드 추출 (안정성을 위해 'foods' 키가 없을 경우 대비)
+    const extractionResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: `당신은 전문 영양사입니다. 사용자의 요청에 맞춰 한국의 실제 식단을 추천하세요.
-          
-          [응답 규칙]
-          1. 추천하는 메뉴 데이터는 반드시 답변 마지막에 [DATA]와 [/DATA] 태그로 감싸서 JSON 배열 형식으로 포함하세요.
-          2. JSON 구조: [{"name": "음식명", "description": "설명", "tags": ["태그1"]}]
-          3. tags는 반드시 다음 목록에서만 선택하세요: ${FILTER_TAGS.join(', ')}.
-          4. 답변 본문에는 특수문자나 복잡한 기호를 피하고 친절하게 설명하세요.`,
+          content:
+            '사용자의 질문에서 언급된 모든 음식명을 추출하여 JSON 배열 형태로 답하세요. 예: { "foods": ["닭가슴살", "고구마"] }.',
         },
-        ...messages.filter((m) => m.role !== 'system'),
+        { role: 'user', content: inputMessage },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    // JSON.parse 에러 방지를 위해 content가 없을 경우 빈 객체 처리
+    const content = extractionResponse.choices[0].message.content;
+    const { foods: keywords = [] } = JSON.parse(content || '{}');
+
+    let foodData = [];
+    if (keywords.length > 0) {
+      // 2. DB 검색: ANY($1)를 사용하여 배열 내 키워드와 일치하는 데이터 조회
+      // (주의: 정확히 일치하는 이름만 검색됩니다. "닭가슴살"과 "훈제 닭가슴살"은 다르게 인식됨)
+      const dbResult = await pool.query(
+        'SELECT id, name, calories, carbo, protein, fat, sugar FROM foods WHERE name = ANY($1)',
+        [keywords],
+      );
+      foodData = dbResult.rows;
+    }
+
+    // 3. OpenAI: 사용자 영양 상태와 DB 데이터를 결합한 최종 식단 조언
+    const finalResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `당신은 전문 영양사입니다. 
+          - 사용자의 현재 영양 상태: ${JSON.stringify(userNutrients)}
+          - 검색된 음식 데이터: ${JSON.stringify(foodData)}
+          
+          위 데이터를 바탕으로 사용자의 질문에 답하세요. 만약 데이터베이스에 검색 결과가 없다면 일반적인 영양 지식을 바탕으로 조언하고, 검색 결과가 있다면 해당 수치(칼로리, 단백질 등)를 인용하여 적합성을 분석해 주세요.`,
+        },
+        ...messages, // 이전 대화 내용 유지
         { role: 'user', content: inputMessage },
       ],
     });
 
-    const fullResponse = completion.choices[0].message.content;
-    const jsonMatch = fullResponse.match(/\[DATA\]([\s\S]*?)\[\/DATA\]/);
-    const chatContent = fullResponse
-      .replace(/\[DATA\]([\s\S]*?)\[\/DATA\]/, '')
-      .trim();
-
-    let extractedFoods = [];
-    if (jsonMatch) {
-      const rawFoods = JSON.parse(jsonMatch[1]);
-      const foodNames = rawFoods.map((f) => f.name);
-
-      // AI가 추천한 이름이 DB에 있는지 확인 (유사 검색)
-      const dbQuery = `
-        SELECT id, name, description, tags, image_url as image 
-        FROM foods 
-        WHERE name = ANY($1)
-      `;
-      const dbResult = await pool.query(dbQuery, [foodNames]);
-
-      // DB에 없는 음식은 AI가 생성한 정보를 기반으로 임시 객체 생성
-      extractedFoods = rawFoods.map((aiFood) => {
-        const matchingDbFood = dbResult.rows.find(
-          (dbFood) => dbFood.name === aiFood.name,
-        );
-        return (
-          matchingDbFood || {
-            ...aiFood,
-            id: `temp-${Date.now()}-${Math.random()}`,
-            image: 'https://via.placeholder.com/150',
-          }
-        );
-      });
-    }
-
-    res.json({
-      success: true,
-      chatContent: chatContent || '요청하신 조건에 맞는 식단을 준비했습니다.',
-      foods: extractedFoods,
+    res.status(200).json({
+      reply: finalResponse.choices[0].message.content,
+      foods: foodData, // 프론트엔드 UI(오른쪽 카드 섹션 등)에서 사용할 상세 정보
     });
-  } catch (err) {
-    console.error('AI 추천 에러:', err);
-    res.status(500).json({
-      success: false,
-      message: 'AI 추천 처리 중 오류가 발생했습니다.',
-    });
+  } catch (error) {
+    console.error('Diet Recommend Error:', error);
+    res.status(500).json({ message: '서버 내부 오류가 발생했습니다.' });
   }
-}
-
-// 3. 즐겨찾기 상태를 DB에 저장 - 사용자의 즐겨찾기 상태에 따라 INSERT 또는 DELETE를 수행합니다.
-export async function toggleFavorite(req, res) {
-  try {
-    const { foodId, isFavorite, userId } = req.body; // userId는 세션이나 토큰에서 가져오는 것을 권장
-
-    if (isFavorite) {
-      // 즐겨찾기 추가 (중복 방지 ON CONFLICT)
-      await pool.query(
-        'INSERT INTO favorites (user_id, food_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [userId, foodId],
-      );
-    } else {
-      // 즐겨찾기 삭제
-      await pool.query(
-        'DELETE FROM favorites WHERE user_id = $1 AND food_id = $2',
-        [userId, foodId],
-      );
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('즐겨찾기 저장 실패:', err);
-    res.status(500).json({
-      success: false,
-      message: '즐겨찾기 상태를 업데이트하지 못했습니다.',
-    });
-  }
-}
+};
