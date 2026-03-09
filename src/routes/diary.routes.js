@@ -235,6 +235,67 @@ router.get('/meal-summary', async (req, res) => {
 });
 
 /**
+
+ * @swagger
+ * /api/diary/monthly:
+ *   get:
+ *     summary: 월별로 식사 기록이 있는 날짜 목록 반환
+ *     tags: [Diary]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 사용자 ID
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: 조회할 연도 (YYYY)
+ *       - in: query
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: 조회할 월 (1~12 또는 '03' 등)
+ *     responses:
+ *       200:
+ *         description: 기록이 존재하는 날짜 목록 ("YYYY-MM-DD")
+ *       400:
+ *         description: 필수 파라미터 누락
+ */
+router.get('/monthly', async (req, res) => {
+  try {
+    const { userId, year, month } = req.query;
+
+    if (!userId || !year || !month) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId, year, month는 필수입니다.',
+      });
+    }
+
+    const paddedMonth = String(month).padStart(2, '0');
+    const targetPrefix = `${year}-${paddedMonth}`;
+
+    const query = `
+      SELECT DISTINCT TO_CHAR(meal_time, 'YYYY-MM-DD') AS record_date
+      FROM diary_entries
+      WHERE user_id = $1 
+        AND TO_CHAR(meal_time, 'YYYY-MM') = $2
+      ORDER BY record_date ASC
+    `;
+
+    const result = await pool.query(query, [userId, targetPrefix]);
+
+    const dates = result.rows.map(row => row.record_date);
+
+    return res.json({ success: true, dates });
+  } catch (err) {
+    console.error(err);
+
  * POST /api/diary/scan
  * AI 식단 분석 결과를 diary_entries에 저장 (ai_scans + diary_entries)
  * req.body: { userId, mealType, mealTime, imageUrl, foods: [{ name, amount, calories, carbohydrate, protein, fat, sugars }] }
@@ -334,6 +395,7 @@ router.post('/scan', async (req, res) => {
     });
   } catch (err) {
     console.error('Diary scan save error:', err);
+
     return res.status(500).json({ success: false, message: err.message });
   }
 });
