@@ -1,24 +1,9 @@
 import express from 'express';
 import { getRandomFoodList, recommendFoodsByAI } from '../controllers/recommendController.js';
-import jwt from "jsonwebtoken";
+import { requireAuth } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-const requireAuth = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ success: false, message: "Authorization 헤더에 토큰이 필요합니다." });
-    }
-
-    const token = authHeader.split(" ")[1];
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'fallback_secret_key');
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(401).json({ success: false, message: "유효하지 않거나 만료된 토큰입니다." });
-    }
-};
 
 /**
  * @swagger

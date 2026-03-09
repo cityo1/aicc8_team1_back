@@ -1,4 +1,4 @@
-import { getUserNotifications, markNotificationAsRead, updateNotificationSettings } from '../models/notificationsModel.js';
+import { getUserNotifications, markNotificationAsRead, updateNotificationSettings, getNotificationSettings } from '../models/notificationsModel.js';
 
 /**
  * [GET] /api/notifications
