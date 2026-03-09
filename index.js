@@ -22,6 +22,7 @@ import scanRoutes from './src/routes/scan.routes.js';
 import notificationsRouter, {
   settingsRouter,
 } from './src/routes/notifications.routes.js';
+import recommendRoutes from './src/routes/recommend.routes.js';
 // import { pool } from "./src/config/db.js";
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/config/swagger.js';
@@ -62,8 +63,8 @@ app.use('/api/google-sheets', googleSheetsRoutes);
 app.use('/api/foods', foodsRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/notifications', notificationsRouter);
-
 app.use('/api/recommend', recommendRoutes);
+app.use('/api/recommendation', recommendRoutes);
 
 // app.get("/api/db/ping", async (req, res) => {
 //   try {
