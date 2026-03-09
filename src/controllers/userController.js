@@ -97,13 +97,13 @@ const login = async (req, res) => {
         const accessToken = jwt.sign(
             { id: user.id, email: user.email, nickname: user.nickname },
             process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'fallback_secret_key',
-            { expiresIn: '15m' }
+            { expiresIn: '2h' }
         );
 
         const refreshToken = jwt.sign(
             { id: user.id, email: user.email },
             process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'fallback_secret_key',
-            { expiresIn: '14d' }
+            { expiresIn: '30d' }
         );
 
         // ✅ refreshToken은 쿠키에 저장 (httpOnly)
@@ -111,7 +111,7 @@ const login = async (req, res) => {
             httpOnly: true,
             secure: false,   // HTTPS면 true
             sameSite: 'lax',
-            maxAge: 14 * 24 * 60 * 60 * 1000
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30일
         });
 
         return res.status(200).json({
@@ -151,7 +151,7 @@ const refresh = async (req, res) => {
         const newAccessToken = jwt.sign(
             { id: user.id, email: user.email, nickname: user.nickname },
             process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "fallback_secret_key",
-            { expiresIn: "15m" }
+            { expiresIn: "2h" }
         );
 
         return res.status(200).json({ message: "토큰 재발급 성공", token: newAccessToken });
