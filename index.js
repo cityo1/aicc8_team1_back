@@ -4,6 +4,11 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import mealsRoutes from './src/routes/meals_routes.js';
 import authRoutes from './src/routes/auth.routes.js';
@@ -14,6 +19,9 @@ import deficiencyRoutes from './src/routes/deficiency.routes.js';
 import googleSheetsRoutes from './src/routes/google_sheets_routes.js';
 import foodsRoutes from './src/routes/foods_routes.js';
 import scanRoutes from './src/routes/scan.routes.js';
+import notificationsRouter, {
+  settingsRouter,
+} from './src/routes/notifications.routes.js';
 // import { pool } from "./src/config/db.js";
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './src/config/swagger.js';
@@ -21,6 +29,9 @@ import swaggerSpec from './src/config/swagger.js';
 import recommendRoutes from './src/routes/recommendRoutes.js';
 
 const app = express();
+
+// Set uploads directory as static route
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // test
 
@@ -44,11 +55,13 @@ app.use('/api/meals', mealsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/mfds', mfdsRoutes);
 app.use('/api/diary', diaryRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/users', userRoutes); // /api/users 경로
+app.use('/api/users', settingsRouter); // /api/users/me/notification-settings 매핑
 app.use('/api/deficiency', deficiencyRoutes);
 app.use('/api/google-sheets', googleSheetsRoutes);
 app.use('/api/foods', foodsRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/notifications', notificationsRouter);
 
 app.use('/api/recommend', recommendRoutes);
 

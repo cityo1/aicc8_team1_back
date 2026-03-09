@@ -1,9 +1,26 @@
 import express from "express";
 import { pool } from "../config/db.js";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
+import path from "path";
 
 const router = express.Router();
 
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, "uploads/");
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 
 /**
@@ -88,7 +105,7 @@ router.get("/search", async (req, res) => {
  *               mealType:
  *                 type: string
  *                 enum: [breakfast, lunch, dinner, snack]
- *               eatenAt:
+ *               mealTime:
  *                 type: string
  *                 format: date-time
  *     responses:
@@ -97,9 +114,9 @@ router.get("/search", async (req, res) => {
  *       400:
  *         description: Invalid input
  */
-router.post("/", async (req, res) => {
+router.post("/", upload.single("image"), async (req, res) => {
     try {
-        const {
+        let {
             userId,
             foodCode,
             foodName = null,
@@ -107,8 +124,12 @@ router.post("/", async (req, res) => {
             mealType = null,
             mealTime = null,
             memo = null,
-            imageUrl = null,
+            imageUrl = null, // fallback for strings
         } = req.body;
+
+        if (req.file) {
+            imageUrl = `/uploads/${req.file.filename}`;
+        }
 
         // 1) 필수값 체크
         if (!userId) return res.status(400).json({ success: false, message: "userId is required" });
@@ -173,7 +194,7 @@ router.post("/", async (req, res) => {
         // 6) INSERT into diary_entries (가져온 영양소 값 포함)
         const result = await pool.query(
             `INSERT INTO diary_entries (
-                id, user_id, food_code, meal_type, amount, meal_time,
+                id, user_id, food_code, meal_type, serving_size, meal_time,
                 snap_food_name, snap_calories, snap_carbohydrate, snap_protein, 
                 snap_fat, snap_sugars, snap_sodium, snap_cholesterol, snap_saturated_fat, snap_trans_fat,
                 image_url, memo,
@@ -222,7 +243,7 @@ router.post("/", async (req, res) => {
                 foodCode: newEntry.food_code,
                 foodName: newEntry.snap_food_name || null,
                 mealType: newEntry.meal_type,
-                servings: Number(newEntry.amount),
+                servings: Number(newEntry.serving_size),
                 mealTime: newEntry.meal_time,
                 calories: newEntry.snap_calories != null ? Number(newEntry.snap_calories) : null,
                 nutrients: {

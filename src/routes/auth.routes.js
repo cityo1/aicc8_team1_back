@@ -134,6 +134,54 @@ router.post("/forgot-password/verify-code", userController.verifyPasswordResetCo
 router.post("/forgot-password/reset-password", userController.resetPassword);
 router.post("/forgot-password/resend-code", userController.resendPasswordResetCode);
 
+// 간단한 인증 미들웨어 (실제로는 jwt.verify를 거치는 별도 미들웨어 파일을 쓰는 것이 좋으나 현재 구조에 맞춰 임시로 작성)
+import jwt from "jsonwebtoken";
+const requireAuth = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        // 테스트의 편의성을 위해 토큰이 없으면 그냥 통과시키지 않고 에러 반환하지만
+        // 만약 테스트 목적으로 하드코딩된 user가 필요하다면 아래 주석 해제하여 사용 가능
+        // req.user = { id: 'uuid-here' }; return next();
+        return res.status(401).json({ success: false, message: "Authorization 헤더에 토큰이 필요합니다." });
+    }
+
+    const token = authHeader.split(" ")[1];
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'fallback_secret_key');
+        req.user = decoded; // controller에서 req.user.id 사용하도록 주입
+        next();
+    } catch (err) {
+        return res.status(401).json({ success: false, message: "유효하지 않거나 만료된 토큰입니다." });
+    }
+};
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: 사용자 정보 조회 (프로필)
+ *     tags: [Auth]
+ */
+router.get("/me", requireAuth, userController.getMyProfile);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   put:
+ *     summary: 사용자 정보 수정 (수정하기 버튼)
+ *     tags: [Auth]
+ */
+router.put("/profile", requireAuth, userController.updateMyProfile);
+
+/**
+ * @swagger
+ * /api/auth/withdraw:
+ *   delete:
+ *     summary: 회원탈퇴 (접속 불가 처리)
+ *     tags: [Auth]
+ */
+router.delete("/withdraw", requireAuth, userController.withdrawUser);
+
 router.get("/login", (req, res) => {
     res.send("login endpoint alive. Use POST.");
 });
