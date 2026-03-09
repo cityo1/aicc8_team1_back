@@ -1,5 +1,5 @@
 import express from "express";
-import { getNotifications, readNotification, updateSettings } from "../controllers/notificationsController.js";
+import { getNotifications, readNotification, updateSettings, getSettings } from "../controllers/notificationsController.js";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
@@ -55,4 +55,5 @@ router.patch("/:id/read", requireAuth, readNotification);
 export default router;
 export const settingsRouter = express.Router();
 
+settingsRouter.get("/me/notification-settings", requireAuth, getSettings);
 settingsRouter.put("/me/notification-settings", requireAuth, updateSettings);
