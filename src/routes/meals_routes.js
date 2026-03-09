@@ -105,7 +105,7 @@ router.get("/search", async (req, res) => {
  *               mealType:
  *                 type: string
  *                 enum: [breakfast, lunch, dinner, snack]
- *               eatenAt:
+ *               mealTime:
  *                 type: string
  *                 format: date-time
  *     responses:
