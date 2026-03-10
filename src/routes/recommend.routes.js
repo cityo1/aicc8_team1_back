@@ -1,9 +1,11 @@
 import express from 'express';
-import { getRandomFoodList, recommendFoodsByAI } from '../controllers/recommendController.js';
-import { requireAuth } from "../middlewares/authMiddleware.js";
+import {
+  getRandomFoodList,
+  recommendFoodsByAI,
+} from '../controllers/recommendController.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
-
 
 /**
  * @swagger
