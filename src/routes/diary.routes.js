@@ -125,6 +125,7 @@ router.get('/daily', async (req, res) => {
         },
         memo: row.memo || null,
         imageUrl: row.image_url || null,
+        aiScanId: row.ai_scan_id || null,
       });
     });
 

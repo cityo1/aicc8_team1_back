@@ -179,16 +179,25 @@ export async function analyzeFood(req, res) {
 
 /**
  * POST /api/scan/save-ai - AI 분석 결과 저장 (ai_scans)
+ * FormData: image(파일), user_id, scan_result(JSON 문자열)
+ * 이미지는 uploads 폴더에 저장되고 DB에는 /uploads/파일명 경로만 저장
  */
 export async function saveAi(req, res) {
   try {
-    const { user_id, image_url, scan_result } = req.body;
+    const { user_id, scan_result } = req.body;
 
-    if (!user_id || !image_url || !scan_result) {
-      return res.status(400).json({ success: false, message: '필수 데이터(user_id, image_url, scan_result)가 누락되었습니다.' });
+    if (!user_id || !scan_result) {
+      return res.status(400).json({ success: false, message: '필수 데이터(user_id, scan_result)가 누락되었습니다.' });
     }
 
-    const saved = await scanModel.saveAiScanData(user_id, image_url, scan_result);
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '이미지 파일(image)이 필요합니다.' });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+
+    const scanResultObj = typeof scan_result === 'string' ? JSON.parse(scan_result) : scan_result;
+    const saved = await scanModel.saveAiScanData(user_id, imageUrl, scanResultObj);
 
     res.json({
       success: true,
@@ -225,12 +234,23 @@ export async function saveDiary(req, res) {
       }
     }
 
+    // 프론트 형식(name, calories, carbohydrate...) → 모델 형식(snap_food_name, snap_calories...) 변환
+    const mappedFoods = foods.map((f) => ({
+      snap_food_name: f.snap_food_name ?? f.name,
+      snap_calories: f.snap_calories ?? f.calories ?? 0,
+      snap_carbohydrate: f.snap_carbohydrate ?? f.carbohydrate ?? 0,
+      snap_protein: f.snap_protein ?? f.protein ?? 0,
+      snap_fat: f.snap_fat ?? f.fat ?? 0,
+      snap_sugars: f.snap_sugars ?? f.sugars ?? 0,
+      serving_size: f.serving_size ?? f.amount ?? 0,
+    }));
+
     const savedEntries = await scanModel.saveDiaryEntries({
       user_id,
       ai_scan_id,
       meal_type,
       mealTime,
-      foods,
+      foods: mappedFoods,
       image_url: finalImageUrl
     });
 
