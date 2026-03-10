@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import * as scanModel from '../models/scanModel.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -173,5 +174,96 @@ export async function analyzeFood(req, res) {
       return res.status(401).json({ message: 'OpenAI API 키가 유효하지 않습니다.' });
     }
     res.status(500).json({ message: msg });
+  }
+}
+
+/**
+ * POST /api/scan/save-ai - AI 분석 결과 저장 (ai_scans)
+ * FormData: image(파일), user_id, scan_result(JSON 문자열)
+ * 이미지는 uploads 폴더에 저장되고 DB에는 /uploads/파일명 경로만 저장
+ */
+export async function saveAi(req, res) {
+  try {
+    const { user_id, scan_result } = req.body;
+
+    if (!user_id || !scan_result) {
+      return res.status(400).json({ success: false, message: '필수 데이터(user_id, scan_result)가 누락되었습니다.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '이미지 파일(image)이 필요합니다.' });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+
+    const scanResultObj = typeof scan_result === 'string' ? JSON.parse(scan_result) : scan_result;
+    const saved = await scanModel.saveAiScanData(user_id, imageUrl, scanResultObj);
+
+    res.json({
+      success: true,
+      message: '저장되었습니다.',
+      data: {
+        scan_result: saved.scan_result,
+        ai_scan_id: saved.id // 3.4 저장 시 연동을 위해 id값을 넘겨줌
+      }
+    });
+  } catch (error) {
+    console.error('saveAi 에러:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+}
+
+/**
+ * POST /api/scan/save-diary - 식단 기록 저장 (diary_entries)
+ */
+export async function saveDiary(req, res) {
+  try {
+    const { user_id, ai_scan_id, meal_type, mealTime, foods, image_url } = req.body;
+
+    if (!user_id || !meal_type || !foods || !Array.isArray(foods)) {
+      return res.status(400).json({ success: false, message: '필수 데이터(user_id, meal_type, foods)가 누락되었습니다.' });
+    }
+
+    let finalImageUrl = image_url;
+
+    // 만약 프론트에서 image_url을 보내지 않고 ai_scan_id만 넘겼다면 DB에서 조회해서 사용
+    if (ai_scan_id && !finalImageUrl) {
+      const scanData = await scanModel.getAiScanById(ai_scan_id);
+      if (scanData) {
+        finalImageUrl = scanData.image_url;
+      }
+    }
+
+    // 프론트 형식(name, calories, carbohydrate...) → 모델 형식(snap_food_name, snap_calories...) 변환
+    const mappedFoods = foods.map((f) => ({
+      snap_food_name: f.snap_food_name ?? f.name,
+      snap_calories: f.snap_calories ?? f.calories ?? 0,
+      snap_carbohydrate: f.snap_carbohydrate ?? f.carbohydrate ?? 0,
+      snap_protein: f.snap_protein ?? f.protein ?? 0,
+      snap_fat: f.snap_fat ?? f.fat ?? 0,
+      snap_sugars: f.snap_sugars ?? f.sugars ?? 0,
+      serving_size: f.serving_size ?? f.amount ?? 0,
+    }));
+
+    const savedEntries = await scanModel.saveDiaryEntries({
+      user_id,
+      ai_scan_id,
+      meal_type,
+      mealTime,
+      foods: mappedFoods,
+      image_url: finalImageUrl
+    });
+
+    res.json({
+      success: true,
+      message: '저장되었습니다.',
+      data: {
+        mealTime: savedEntries.length > 0 ? savedEntries[0].meal_time : mealTime
+      }
+    });
+
+  } catch (error) {
+    console.error('saveDiary 에러:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
   }
 }

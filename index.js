@@ -22,6 +22,7 @@ import scanRoutes from './src/routes/scan.routes.js';
 import notificationsRouter, {
   settingsRouter,
 } from './src/routes/notifications.routes.js';
+import { startNotificationCron } from './src/cron/notificationCron.js';
 import recommendRoutes from './src/routes/recommend.routes.js';
 // import { pool } from "./src/config/db.js";
 import swaggerUi from 'swagger-ui-express';
@@ -74,4 +75,7 @@ app.use('/api/recommendation', recommendRoutes);
 // });
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  startNotificationCron();
+});
