@@ -20,7 +20,7 @@ router.post('/sheet/import', async (req, res) => {
                 "식품코드": "food_code",
                 "식품명": "food_name",
                 "식품대분류명": "category",
-                "에너지(kcal)": "calories",
+                "칼로리(kcal)": "calories",
                 "탄수화물(g)": "carbohydrate",
                 "단백질(g)": "protein",
                 "지방(g)": "fat",
