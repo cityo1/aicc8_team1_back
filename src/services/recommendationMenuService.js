@@ -1,0 +1,124 @@
+import axios from 'axios';
+import { pool } from '../config/db.js';
+import { createNotification } from '../models/notificationsModel.js';
+
+const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+const SEOUL = { lat: 37.5665, lon: 126.978 };
+
+/** weather_code: 61-67=rain, 80-82=showers */
+const isRainy = (code) => code >= 61 && code <= 67 || code >= 80 && code <= 82;
+
+/**
+ * 날씨에 따른 메뉴 추천
+ */
+function getMenuByWeather(weatherCode, temp) {
+  if (isRainy(weatherCode)) {
+    return {
+      intro: '비 오는 날이네요!',
+      menu: '두부 전골',
+      desc: '칼로리는 낮으면서 따뜻한',
+    };
+  }
+  if (temp < 5) {
+    return {
+      intro: '춥죠?',
+      menu: '된장국과 계란찜',
+      desc: '따뜻하게 속을 채워줄',
+    };
+  }
+  if (temp > 28) {
+    return {
+      intro: '날씨가 더워요!',
+      menu: '냉모밀과 오이무침',
+      desc: '시원하게 한 끼',
+    };
+  }
+  return {
+    intro: '오늘 메뉴 고민되시죠?',
+    menu: '샐러드와 닭가슴살',
+    desc: '담백하고 균형 잡힌',
+  };
+}
+
+/**
+ * 날씨 조회 (서울 기준)
+ */
+async function fetchWeather() {
+  const { data } = await axios.get(OPEN_METEO_URL, {
+    params: {
+      latitude: SEOUL.lat,
+      longitude: SEOUL.lon,
+      current: 'weather_code,temperature_2m',
+      timezone: 'Asia/Seoul',
+    },
+    timeout: 5000,
+  });
+  const c = data.current;
+  return { code: c.weather_code, temp: c.temperature_2m ?? 15 };
+}
+
+/**
+ * 오늘 recommendation_menu 이미 발송했는지
+ */
+async function alreadySent(userId, dateStr) {
+  const res = await pool.query(
+    `SELECT 1 FROM notifications
+     WHERE user_id = $1 AND type = 'recommendation_menu'
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = $2::date
+     LIMIT 1`,
+    [userId, dateStr]
+  );
+  return res.rows.length > 0;
+}
+
+/**
+ * 메뉴 고민 해결 알림 배치 (날씨 연동)
+ * - 점심·저녁 메뉴 고민 시간대: 11:00~12:00, 17:00~18:00
+ */
+function isMealDecisionWindow() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const total = now.getHours() * 60 + now.getMinutes();
+  return (total >= 11 * 60 && total < 12 * 60) || (total >= 17 * 60 && total < 18 * 60);
+}
+
+export async function runRecommendationMenuJob() {
+  if (!isMealDecisionWindow()) {
+    return { sent: 0, reason: 'not_meal_decision_window' };
+  }
+
+  let weather = { code: 0, temp: 15 };
+  try {
+    weather = await fetchWeather();
+  } catch (err) {
+    console.warn('날씨 API 조회 실패, 기본 메뉴 사용:', err.message);
+  }
+
+  const todayRes = await pool.query(
+    `SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS today`
+  );
+  const dateStr = todayRes.rows[0].today.toISOString().slice(0, 10);
+  const rec = getMenuByWeather(weather.code, weather.temp);
+  const message = `${rec.intro} ${rec.desc} '${rec.menu}' 레시피를 확인해보세요.`;
+  let sent = 0;
+
+  try {
+    const usersRes = await pool.query(
+      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
+    );
+
+    for (const { id: userId } of usersRes.rows) {
+      if (await alreadySent(userId, dateStr)) continue;
+      await createNotification({
+        userId,
+        type: 'recommendation_menu',
+        title: '메뉴 추천',
+        message,
+      });
+      sent++;
+    }
+    return { sent, weather: { code: weather.code, temp: weather.temp } };
+  } catch (error) {
+    console.error('runRecommendationMenuJob 에러:', error);
+    throw error;
+  }
+}

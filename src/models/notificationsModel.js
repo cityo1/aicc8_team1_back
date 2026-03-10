@@ -29,6 +29,26 @@ export const getUserNotifications = async (userId) => {
 };
 
 /**
+ * 알림 생성
+ * @param {{ userId: string, type: string, title: string, message: string }} data
+ */
+export const createNotification = async ({ userId, type, title, message }) => {
+    const id = uuidv4();
+    const query = `
+    INSERT INTO notifications (id, user_id, type, title, message, is_read)
+    VALUES ($1, $2, $3, $4, $5, false)
+    RETURNING id, type, title, message, is_read, created_at
+  `;
+    try {
+        const { rows } = await pool.query(query, [id, userId, type, title, message]);
+        return rows[0];
+    } catch (error) {
+        console.error('createNotification 에러:', error);
+        throw error;
+    }
+};
+
+/**
  * 특정 알림 읽음 처리
  */
 export const markNotificationAsRead = async (notificationId, userId) => {
