@@ -41,10 +41,13 @@ async function isGoalAchieved(userId, lastStart, lastEnd) {
   return avgScore >= GOAL_SCORE_THRESHOLD;
 }
 
+/**
+ * 이번 주(월)에 이미 발송했는지 (mealNudgeService 패턴 - type+title+DB 날짜)
+ */
 async function alreadySentThisWeek(userId, mondayStr) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
-     WHERE user_id = $1 AND type = 'goal_achievement'
+     WHERE user_id = $1 AND type = 'goal_achievement' AND title = '목표 달성!'
        AND (created_at AT TIME ZONE 'Asia/Seoul')::date >= $2::date
      LIMIT 1`,
     [userId, mondayStr]

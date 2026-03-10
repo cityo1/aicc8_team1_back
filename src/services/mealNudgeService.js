@@ -112,8 +112,12 @@ export async function runMealNudgeJob() {
         message: meta.message,
       });
       sent++;
+      console.log(`[meal-nudge] 발송: userId=${userId} ${meta.title}`);
     }
 
+    if (sent > 0) {
+      console.log(`[meal-nudge] 완료: ${sent}건 발송`);
+    }
     return sent > 0
       ? { sent, mealType: 'per_user' }
       : { sent: 0, reason: 'no_match' };

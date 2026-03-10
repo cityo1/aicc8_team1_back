@@ -73,13 +73,16 @@ function getMostDeficient(current, target) {
   return key;
 }
 
-async function alreadySent(userId, dateStr) {
+/**
+ * 오늘 recommendation_tomorrow 이미 발송했는지 (mealNudgeService 패턴 - type+title+DB 현재 날짜)
+ */
+async function alreadySent(userId) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
-     WHERE user_id = $1 AND type = 'recommendation_tomorrow'
-       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = $2::date
+     WHERE user_id = $1 AND type = 'recommendation_tomorrow' AND title = '내일의 식단 제안'
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
      LIMIT 1`,
-    [userId, dateStr]
+    [userId]
   );
   return res.rows.length > 0;
 }
@@ -109,7 +112,7 @@ export async function runRecommendationTomorrowJob() {
       ]);
       const deficient = getMostDeficient(current, target);
       if (!deficient) continue;
-      if (await alreadySent(userId, dateStr)) continue;
+      if (await alreadySent(userId)) continue;
 
       const s = SUGGESTIONS[deficient];
       const message = `내일 아침은 오늘 부족했던 ${s.label}를 채워줄 '${s.menu}' 식단 어떠세요? ${s.emoji}`;

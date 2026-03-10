@@ -59,15 +59,15 @@ async function fetchWeather() {
 }
 
 /**
- * 오늘 recommendation_menu 이미 발송했는지
+ * 오늘 recommendation_menu 이미 발송했는지 (mealNudgeService 패턴 - type+title+DB 현재 날짜)
  */
-async function alreadySent(userId, dateStr) {
+async function alreadySent(userId) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
-     WHERE user_id = $1 AND type = 'recommendation_menu'
-       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = $2::date
+     WHERE user_id = $1 AND type = 'recommendation_menu' AND title = '메뉴 추천'
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
      LIMIT 1`,
-    [userId, dateStr]
+    [userId]
   );
   return res.rows.length > 0;
 }
@@ -101,7 +101,7 @@ export async function runRecommendationMenuJob() {
     for (const { userId, config } of usersWithConfig) {
       const inWindow = isInTimeWindow(config.time1, currentMinutes) || isInTimeWindow(config.time2, currentMinutes);
       if (!inWindow) continue;
-      if (await alreadySent(userId, dateStr)) continue;
+      if (await alreadySent(userId)) continue;
       await createNotification({
         userId,
         type: 'recommendation_menu',

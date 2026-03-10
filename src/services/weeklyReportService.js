@@ -39,12 +39,12 @@ async function getWeeklyScore(userId, startDate, endDate) {
 }
 
 /**
- * 이번 주(월)에 이미 발송했는지
+ * 이번 주(월)에 이미 발송했는지 (mealNudgeService 패턴 - type+title+DB 날짜)
  */
 async function alreadySentThisWeek(userId, mondayStr) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
-     WHERE user_id = $1 AND type = 'weekly_report'
+     WHERE user_id = $1 AND type = 'weekly_report' AND title = '주간 리포트'
        AND (created_at AT TIME ZONE 'Asia/Seoul')::date >= $2::date
      LIMIT 1`,
     [userId, mondayStr]

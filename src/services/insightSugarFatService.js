@@ -43,16 +43,16 @@ async function getTargets(userId, dateStr) {
 }
 
 /**
- * 이미 insight_sugar_fat 발송했는지 (user+date+meal)
+ * 이미 insight_sugar_fat 발송했는지 (user+meal, mealNudgeService 패턴 - DB 현재 날짜 사용)
  */
-async function alreadySent(userId, dateStr, mealType) {
+async function alreadySent(userId, mealType) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
      WHERE user_id = $1 AND type = 'insight_sugar_fat'
        AND message LIKE $2
-       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = $3::date
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
      LIMIT 1`,
-    [userId, `%${MEAL_LABELS[mealType]}%`, dateStr]
+    [userId, `%${MEAL_LABELS[mealType]}%`]
   );
   return res.rows.length > 0;
 }
@@ -91,7 +91,7 @@ export async function runInsightSugarFatJob() {
         const overFat = fat >= thresholdFat;
         if (!overSugars && !overFat) continue;
 
-        if (await alreadySent(userId, dateStr, mealType)) continue;
+        if (await alreadySent(userId, mealType)) continue;
 
         const label = MEAL_LABELS[mealType];
         let message;
