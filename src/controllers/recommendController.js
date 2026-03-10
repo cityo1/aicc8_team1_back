@@ -22,7 +22,13 @@ export const getRandomFoodList = async (req, res) => {
             foods: foods.map(f => ({
                 id: f.id,
                 name: f.name,
-                image: null
+                image: f.image,
+                kcal: f.kcal,
+                carbs: f.carbs,
+                protein: f.protein,
+                fat: f.fat,
+                sugar: f.sugar,
+                status: f.status
             }))
         });
     } catch (error) {
@@ -105,7 +111,13 @@ export const recommendFoodsByAI = async (req, res) => {
         const responseFoodsList = recommendedFoods.map(f => ({
             id: f.id,
             name: f.name,
-            image: f.image // 없을경우 null
+            image: f.image, // 없을경우 null
+            kcal: f.kcal,
+            carbs: f.carbs,
+            protein: f.protein,
+            fat: f.fat,
+            sugar: f.sugar,
+            status: f.status
         }));
 
         // 5. 추천 기록 DB(recommendations 테이블) 저장
