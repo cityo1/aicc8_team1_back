@@ -37,31 +37,6 @@ const cronAuth = (req, res, next) => {
 router.get("/", requireAuth, getNotifications);
 
 /**
- * POST /api/notifications/test
- * 테스트용: 현재 로그인한 사용자에게 샘플 알림 3개 생성 (시간 제한 없음)
- */
-router.post("/test", requireAuth, async (req, res) => {
-  try {
-    const { createNotification } = await import("../models/notificationsModel.js");
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ success: false, message: "인증 필요" });
-
-    const samples = [
-      { type: "recommendation_menu", title: "메뉴 추천", message: "오늘 메뉴 고민되시죠? 담백하고 균형 잡힌 '샐러드와 닭가슴살' 레시피를 확인해보세요." },
-      { type: "insight_protein", title: "단백질 채우기", message: "오늘 목표 단백질까지 20g 남았어요! 간식으로 삶은 계란이나 두유 어떠세요? 💪" },
-      { type: "weekly_report", title: "주간 리포트", message: "지난주 'HoneyMat' 리포트가 도착했습니다! 영양 점수를 확인해보세요. 📈" },
-    ];
-    for (const s of samples) {
-      await createNotification({ userId, ...s });
-    }
-    return res.status(200).json({ success: true, message: "테스트 알림 3개 생성됨" });
-  } catch (error) {
-    console.error("test 알림 에러:", error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-/**
  * @swagger
  * /api/notifications/{id}/read:
  *   patch:
