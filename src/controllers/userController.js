@@ -68,6 +68,9 @@ const signup = async (req, res) => {
         });
     } catch (error) {
         console.error("signup 에러:", error);
+        if (error.code === '23505' && error.constraint === 'users_email_key') {
+            return res.status(409).json({ message: "이미 가입되어 있거나 탈퇴 처리되어 재가입이 불가능한 이메일입니다." });
+        }
         res.status(500).json({ message: "서버 내부 오류가 발생했습니다." });
     }
 };

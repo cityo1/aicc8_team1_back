@@ -11,7 +11,15 @@ export const getRandomFoods = async (limit = 5) => {
         food_name AS name, 
         -- image_url이 foods 테이블에 없으면 null을 반환합니다. 
         -- 만약 있다면 column 이름을 맞추어 수정하세요.
-        null AS image 
+        null AS image ,
+        calories AS kcal,
+        carbohydrate AS carbs,
+        protein,
+        fat,
+        sugars AS sugar,
+        null AS status
+        
+        
     FROM foods 
     ORDER BY RANDOM() 
     LIMIT $1
@@ -38,7 +46,13 @@ export const searchFoodsByKeywords = async (keywords) => {
     SELECT 
       food_code AS id, 
       food_name AS name, 
-      null AS image
+      null AS image,
+      calories AS kcal,
+      carbohydrate AS carbs,
+      protein,
+      fat,
+      sugars AS sugar,
+      null AS status
     FROM foods
     WHERE ${conditions.join(' OR ')}
     LIMIT 10
