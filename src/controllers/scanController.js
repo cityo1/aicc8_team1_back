@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import * as scanModel from '../models/scanModel.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -173,5 +174,76 @@ export async function analyzeFood(req, res) {
       return res.status(401).json({ message: 'OpenAI API 키가 유효하지 않습니다.' });
     }
     res.status(500).json({ message: msg });
+  }
+}
+
+/**
+ * POST /api/scan/save-ai - AI 분석 결과 저장 (ai_scans)
+ */
+export async function saveAi(req, res) {
+  try {
+    const { user_id, image_url, scan_result } = req.body;
+
+    if (!user_id || !image_url || !scan_result) {
+      return res.status(400).json({ success: false, message: '필수 데이터(user_id, image_url, scan_result)가 누락되었습니다.' });
+    }
+
+    const saved = await scanModel.saveAiScanData(user_id, image_url, scan_result);
+
+    res.json({
+      success: true,
+      message: '저장되었습니다.',
+      data: {
+        scan_result: saved.scan_result,
+        ai_scan_id: saved.id // 3.4 저장 시 연동을 위해 id값을 넘겨줌
+      }
+    });
+  } catch (error) {
+    console.error('saveAi 에러:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+}
+
+/**
+ * POST /api/scan/save-diary - 식단 기록 저장 (diary_entries)
+ */
+export async function saveDiary(req, res) {
+  try {
+    const { user_id, ai_scan_id, meal_type, mealTime, foods, image_url } = req.body;
+
+    if (!user_id || !meal_type || !foods || !Array.isArray(foods)) {
+      return res.status(400).json({ success: false, message: '필수 데이터(user_id, meal_type, foods)가 누락되었습니다.' });
+    }
+
+    let finalImageUrl = image_url;
+
+    // 만약 프론트에서 image_url을 보내지 않고 ai_scan_id만 넘겼다면 DB에서 조회해서 사용
+    if (ai_scan_id && !finalImageUrl) {
+      const scanData = await scanModel.getAiScanById(ai_scan_id);
+      if (scanData) {
+        finalImageUrl = scanData.image_url;
+      }
+    }
+
+    const savedEntries = await scanModel.saveDiaryEntries({
+      user_id,
+      ai_scan_id,
+      meal_type,
+      mealTime,
+      foods,
+      image_url: finalImageUrl
+    });
+
+    res.json({
+      success: true,
+      message: '저장되었습니다.',
+      data: {
+        mealTime: savedEntries.length > 0 ? savedEntries[0].meal_time : mealTime
+      }
+    });
+
+  } catch (error) {
+    console.error('saveDiary 에러:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
   }
 }

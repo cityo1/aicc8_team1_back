@@ -17,4 +17,8 @@ const upload = multer({
 router.post('/food', upload.single('image'), scanController.analyzeFood);
 router.post('/food/reanalyze', express.json(), scanController.reanalyzeFood);
 
+// AI 분석 결과 저장 및 식단 기록 저장 API 추가
+router.post('/save-ai', express.json(), scanController.saveAi);
+router.post('/save-diary', express.json(), scanController.saveDiary);
+
 export default router;
