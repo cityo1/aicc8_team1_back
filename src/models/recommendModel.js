@@ -46,7 +46,13 @@ export const searchFoodsByKeywords = async (keywords) => {
     SELECT 
       food_code AS id, 
       food_name AS name, 
-      null AS image
+      null AS image,
+      calories AS kcal,
+      carbohydrate AS carbs,
+      protein,
+      fat,
+      sugars AS sugar,
+      null AS status
     FROM foods
     WHERE ${conditions.join(' OR ')}
     LIMIT 10
