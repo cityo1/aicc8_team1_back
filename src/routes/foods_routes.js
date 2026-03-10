@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/sheet/import', async (req, res) => {
     try {
         let {
-            csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRG0hhlB4XfYM_pQ7OYhDMh3QG1xLnHc_-FqitnphVFAjVtxzxI7yi5PfkIGNXdxqsiqj0Iv-NwuPEo/pub?output=csv",
+            csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdxK328L_8O9rzCzhV5tA5C8WduDrFQyngy2qR1eTQDYXd0GOvrmHZ5b0KfPMxFbNRH7RuZLuQ-iZd/pub?gid=1763039306&single=true&output=csv",
             mode = 'upsert',
             uniqueKey = 'food_code',
             mapping
@@ -20,7 +20,8 @@ router.post('/sheet/import', async (req, res) => {
                 "식품코드": "food_code",
                 "식품명": "food_name",
                 "식품대분류명": "category",
-                "에너지(kcal)": "calories",
+                "칼로리(kcal)": "calories",
+                "탄수화물(g)": "carbohydrate",
                 "단백질(g)": "protein",
                 "지방(g)": "fat",
                 "당류(g)": "sugars",
@@ -36,8 +37,16 @@ router.post('/sheet/import', async (req, res) => {
         const response = await axios.get(csvUrl);
         const csvData = response.data;
 
-        // 2. CSV 파싱
-        const jsonData = parse(csvData, {
+        // 2. CSV 전처리 및 파싱
+        const lines = csvData.split('\n');
+        const headerIndex = lines.findIndex(line => line.includes('식품코드'));
+
+        if (headerIndex === -1) {
+            return res.status(400).json({ success: false, message: 'CSV에 "식품코드" 헤더가 없습니다. 구글 시트를 확인해주세요.' });
+        }
+
+        const validCsvData = lines.slice(headerIndex).join('\n');
+        const jsonData = parse(validCsvData, {
             columns: true,
             skip_empty_lines: true
         });

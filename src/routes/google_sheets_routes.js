@@ -9,7 +9,7 @@ const router = express.Router();
 // URL 쿼리를 넘기지 않으면 아래의 기본 URL이 사용됩니다.
 router.get('/', async (req, res) => {
     try {
-        const defaultUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVx5HCfmel_V5xZzwtoOko5zRWReD5QsoZ2d4HAL1i2jivdjt5ueja5QeVT5z_U44HcJLhF21tYwnc/pub?output=csv"; // 임시 값이지만 추후 전체 URL로 교체하세요.
+        const defaultUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdxK328L_8O9rzCzhV5tA5C8WduDrFQyngy2qR1eTQDYXd0GOvrmHZ5b0KfPMxFbNRH7RuZLuQ-iZd/pub?gid=1763039306&single=true&output=csv"; // 임시 값이지만 추후 전체 URL로 교체하세요.
         const csvUrl = req.query.url || defaultUrl;
 
         // 1. 구글 시트 CSV 데이터 가져오기
