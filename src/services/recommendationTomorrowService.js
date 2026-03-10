@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const DEFAULTS = { carb: 250, protein: 50, fat: 65 };
 const MIN_DEFICIT_RATIO = 0.2;  // 목표의 20% 이상 부족 시 제안
@@ -10,15 +11,6 @@ const SUGGESTIONS = {
   protein: { label: '단백질', menu: '계란과 두유', emoji: '🥚' },
   fat: { label: '건강한 지방', menu: '아보카도와 견과류', emoji: '🥑' },
 };
-
-/**
- * 저녁 20:00~22:00 KST
- */
-function isEveningWindow() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const total = now.getHours() * 60 + now.getMinutes();
-  return total >= 20 * 60 && total < 22 * 60;
-}
 
 /**
  * 오늘 일간 영양 합계
@@ -94,11 +86,11 @@ async function alreadySent(userId, dateStr) {
 
 /**
  * 내일의 식단 제안 알림 배치
+ * - 사용자 설정 time ±30분 창에만 실행 (기본 20:30)
  */
 export async function runRecommendationTomorrowJob() {
-  if (!isEveningWindow()) {
-    return { sent: 0, reason: 'not_evening' };
-  }
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   const todayRes = await pool.query(
     `SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS today`
@@ -107,11 +99,10 @@ export async function runRecommendationTomorrowJob() {
   let sent = 0;
 
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('recommendation_tomorrow');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      if (!isInTimeWindow(config.time, currentMinutes)) continue;
       const [current, target] = await Promise.all([
         getDailyTotals(userId, dateStr),
         getTargets(userId, dateStr),
