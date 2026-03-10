@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS users (
     receive_notifications BOOLEAN DEFAULT true,  -- 기존 설정에서 이동
     eating_habits TEXT,                          -- 기존 설정에서 이동
     allergies TEXT[],                            -- 기존 설정에서 이동
+    breakfast_time TIME DEFAULT '08:00',         -- meal_nudge 아침 알림 시간
+    lunch_time TIME DEFAULT '12:30',             -- meal_nudge 점심 알림 시간
+    dinner_time TIME DEFAULT '19:00',            -- meal_nudge 저녁 알림 시간
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),        -- 기존 설정에서 이동
     deleted_at TIMESTAMPTZ

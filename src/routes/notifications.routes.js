@@ -1,6 +1,10 @@
 import express from "express";
 import { getNotifications, readNotification, updateSettings, getSettings } from "../controllers/notificationsController.js";
 import { getPattern, updatePattern } from "../controllers/mealPatternController.js";
+import {
+  getSettings as getNotificationTypeSettings,
+  updateSettings as updateNotificationTypeSettings,
+} from "../controllers/notificationTypeSettingsController.js";
 import { runMealNudgeJob } from "../services/mealNudgeService.js";
 import { runStreakNudgeJob } from "../services/streakNudgeService.js";
 import { runInsightSugarFatJob } from "../services/insightSugarFatService.js";
@@ -44,8 +48,8 @@ router.post("/test", requireAuth, async (req, res) => {
 
     const samples = [
       { type: "recommendation_menu", title: "메뉴 추천", message: "오늘 메뉴 고민되시죠? 담백하고 균형 잡힌 '샐러드와 닭가슴살' 레시피를 확인해보세요." },
-      { type: "meal_nudge", title: "점심 기록 알림", message: "오늘 점심은 무엇을 드셨나요? 사진 한 장으로 '꿀맛' 점수를 확인해보세요! 🍯" },
       { type: "insight_protein", title: "단백질 채우기", message: "오늘 목표 단백질까지 20g 남았어요! 간식으로 삶은 계란이나 두유 어떠세요? 💪" },
+      { type: "weekly_report", title: "주간 리포트", message: "지난주 'HoneyMat' 리포트가 도착했습니다! 영양 점수를 확인해보세요. 📈" },
     ];
     for (const s of samples) {
       await createNotification({ userId, ...s });
@@ -199,3 +203,5 @@ settingsRouter.get("/me/notification-settings", requireAuth, getSettings);
 settingsRouter.put("/me/notification-settings", requireAuth, updateSettings);
 settingsRouter.get("/me/meal-pattern", requireAuth, getPattern);
 settingsRouter.put("/me/meal-pattern", requireAuth, updatePattern);
+settingsRouter.get("/me/notification-type-settings", requireAuth, getNotificationTypeSettings);
+settingsRouter.put("/me/notification-type-settings", requireAuth, updateNotificationTypeSettings);

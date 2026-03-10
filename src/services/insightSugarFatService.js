@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const MEAL_LABELS = { breakfast: '아침', lunch: '점심', dinner: '저녁' };
 const DEFAULT_SUGARS_PER_MEAL = 17;  // 일일 50g / 3
@@ -59,9 +60,12 @@ async function alreadySent(userId, dateStr, mealType) {
 /**
  * 당류/지방 주의 알림 배치
  * - 오늘 아침/점심/저녁 끼니별로 당류·지방 목표 초과 여부 확인
- * - 13:30~14:30 점심 시간대, 20:00~21:00 저녁 시간대 등에 실행하면 직전 끼니 검사
+ * - 사용자 설정 time1(점심 후), time2(저녁 후) ±30분 창에만 실행
  */
 export async function runInsightSugarFatJob() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
   const todayRes = await pool.query(
     `SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS today`
   );
@@ -69,11 +73,11 @@ export async function runInsightSugarFatJob() {
   let sent = 0;
 
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('insight_sugar_fat');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      const inWindow = isInTimeWindow(config.time1, currentMinutes) || isInTimeWindow(config.time2, currentMinutes);
+      if (!inWindow) continue;
       const targets = await getTargets(userId, dateStr);
       const thresholdSugars = targets.sugars * EXCEED_RATIO;
       const thresholdFat = targets.fat * EXCEED_RATIO;

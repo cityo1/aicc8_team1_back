@@ -1,17 +1,9 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const DEFAULT_PROTEIN_TARGET = 50;  // g
 const MIN_DEFICIT = 15;             // 15g 이상 부족 시 알림
-
-/**
- * 저녁 시간대(19:00~22:00 KST)인지
- */
-function isEveningWindow() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const total = now.getHours() * 60 + now.getMinutes();
-  return total >= 19 * 60 && total < 22 * 60;
-}
 
 /**
  * 오늘 일간 단백질 합계
@@ -58,13 +50,12 @@ async function alreadySent(userId, dateStr) {
 
 /**
  * 단백질 채우기 제안 알림 배치
- * - 저녁 19:00~22:00에만 실행
+ * - 사용자 설정 time ±30분 창에만 실행 (기본 20:00)
  * - 목표 대비 부족분 15g 이상 시 알림
  */
 export async function runInsightProteinJob() {
-  if (!isEveningWindow()) {
-    return { sent: 0, reason: 'not_evening' };
-  }
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   const todayRes = await pool.query(
     `SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS today`
@@ -73,11 +64,10 @@ export async function runInsightProteinJob() {
   let sent = 0;
 
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('insight_protein');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      if (!isInTimeWindow(config.time, currentMinutes)) continue;
       const [current, target] = await Promise.all([
         getDailyProtein(userId, dateStr),
         getProteinTarget(userId, dateStr),
