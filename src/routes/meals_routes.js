@@ -121,6 +121,8 @@ router.post("/", upload.single("image"), async (req, res) => {
             foodCode,
             foodName = null,
             servings = 1,
+            servingSize = null,
+            calories = null,
             mealType = null,
             mealTime = null,
             memo = null,
@@ -176,10 +178,10 @@ router.post("/", upload.single("image"), async (req, res) => {
 
         if (foodRes.rows.length > 0) {
             const food = foodRes.rows[0];
-            // 제공량(servings)을 곱해서 snap_* 에 넣습니다.
+            // 제공량(servings)을 곱해서 snap_* 에 넣습니다. 단 사용자가 전송한 calories가 우선
             snapData = {
                 snap_food_name: foodName || food.food_name || null,
-                snap_calories: food.calories != null ? (Number(food.calories) * s) : null,
+                snap_calories: calories != null ? Number(calories) : (food.calories != null ? (Number(food.calories) * s) : null),
                 snap_carbohydrate: food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null,
                 snap_protein: food.protein != null ? (Number(food.protein) * s) : null,
                 snap_fat: food.fat != null ? (Number(food.fat) * s) : null,
@@ -214,7 +216,7 @@ router.post("/", upload.single("image"), async (req, res) => {
                 userId,
                 foodCode,
                 mealType,
-                s,
+                servingSize != null ? Number(servingSize) : s,
                 mealTime,
                 snapData.snap_food_name,
                 snapData.snap_calories,
