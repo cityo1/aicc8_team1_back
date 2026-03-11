@@ -1,5 +1,6 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getOrCreateGoals } from '../models/nutritionGoalsModel.js';
 import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const MEAL_LABELS = { breakfast: '아침', lunch: '점심', dinner: '저녁' };
@@ -26,33 +27,26 @@ async function getMealTotals(userId, dateStr, mealType) {
 }
 
 /**
- * nutrition_goals에서 일일 목표 조회 (없으면 기본값)
+ * nutrition_goals에서 일일 목표 조회 (없으면 getOrCreateGoals로 자동 생성)
  */
 async function getTargets(userId, dateStr) {
-  const res = await pool.query(
-    `SELECT target_sugars, target_fat
-     FROM nutrition_goals
-     WHERE user_id = $1 AND target_date = $2::date
-     ORDER BY created_at DESC LIMIT 1`,
-    [userId, dateStr]
-  );
-  const r = res.rows[0];
-  const sugars = r?.target_sugars != null ? Number(r.target_sugars) / 3 : DEFAULT_SUGARS_PER_MEAL;
-  const fat = r?.target_fat != null ? Number(r.target_fat) / 3 : DEFAULT_FAT_PER_MEAL;
+  const goals = await getOrCreateGoals(userId, dateStr);
+  const sugars = goals?.target_sugars != null ? Number(goals.target_sugars) / 3 : DEFAULT_SUGARS_PER_MEAL;
+  const fat = goals?.target_fat != null ? Number(goals.target_fat) / 3 : DEFAULT_FAT_PER_MEAL;
   return { sugars, fat };
 }
 
 /**
- * 이미 insight_sugar_fat 발송했는지 (user+date+meal)
+ * 이미 insight_sugar_fat 발송했는지 (user+meal, mealNudgeService 패턴 - DB 현재 날짜 사용)
  */
-async function alreadySent(userId, dateStr, mealType) {
+async function alreadySent(userId, mealType) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
      WHERE user_id = $1 AND type = 'insight_sugar_fat'
        AND message LIKE $2
-       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = $3::date
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
      LIMIT 1`,
-    [userId, `%${MEAL_LABELS[mealType]}%`, dateStr]
+    [userId, `%${MEAL_LABELS[mealType]}%`]
   );
   return res.rows.length > 0;
 }
@@ -91,7 +85,7 @@ export async function runInsightSugarFatJob() {
         const overFat = fat >= thresholdFat;
         if (!overSugars && !overFat) continue;
 
-        if (await alreadySent(userId, dateStr, mealType)) continue;
+        if (await alreadySent(userId, mealType)) continue;
 
         const label = MEAL_LABELS[mealType];
         let message;
