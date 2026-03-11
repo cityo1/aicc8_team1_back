@@ -1,9 +1,12 @@
 import express from 'express';
-import { getRandomFoodList, recommendFoodsByAI } from '../controllers/recommendController.js';
-import { requireAuth } from "../middlewares/authMiddleware.js";
+import {
+  getRandomFoodList,
+  getRelatedFoodList,
+  recommendFoodsByAI,
+} from '../controllers/recommendController.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
-
 
 /**
  * @swagger
@@ -13,6 +16,15 @@ const router = express.Router();
  *     tags: [Recommend]
  */
 router.get('/random', getRandomFoodList);
+
+/**
+ * @swagger
+ * /api/recommend/related:
+ *   get:
+ *     summary: 키워드로 관련 음식 검색 (접두어 제외)
+ *     tags: [Recommend]
+ */
+router.get('/related', getRelatedFoodList);
 
 /**
  * @swagger
