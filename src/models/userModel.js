@@ -235,6 +235,28 @@ const deleteUser = async (id) => {
   }
 };
 
+/**
+ * 프로필 이미지 업데이트 (또는 삭제 - null 처리)
+ */
+const updateProfileImage = async (id, profileImageUrl) => {
+  const query = `
+    UPDATE users 
+    SET 
+        profile_image_url = $1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2 AND deleted_at IS NULL
+    RETURNING id, profile_image_url
+  `;
+
+  try {
+    const { rows } = await pool.query(query, [profileImageUrl, id]);
+    return rows[0];
+  } catch (error) {
+    console.error('updateProfileImage 에러:', error);
+    throw error;
+  }
+};
+
 export {
   findUserByEmail,
   findUserByNickname,
@@ -245,5 +267,6 @@ export {
   updateUserPassword,
   findUserById,
   updateProfile,
+  updateProfileImage,
   deleteUser,
 };

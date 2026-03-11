@@ -6,7 +6,7 @@ import {
     findUserByEmail, findUserByNickname, createUser,
     savePasswordResetCode, findPasswordResetInfo,
     savePasswordResetToken, updateUserPassword,
-    findUserById, updateProfile, deleteUser
+    findUserById, updateProfile, updateProfileImage, deleteUser
 } from "../models/userModel.js";
 import { sendVerificationEmail } from "../services/emailService.js";
 
@@ -382,6 +382,49 @@ const withdrawUser = async (req, res) => {
     }
 };
 
+const uploadProfileImageHandler = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "이미지 파일이 필요합니다." });
+        }
+
+        const profileImageUrl = `/uploads/profile/${req.file.filename}`;
+        await updateProfileImage(userId, profileImageUrl);
+
+        return res.status(200).json({
+            success: true,
+            profileImage: profileImageUrl
+        });
+    } catch (error) {
+        console.error("uploadProfileImageHandler 에러:", error);
+        res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
+    }
+};
+
+const deleteProfileImageHandler = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+        
+        await updateProfileImage(userId, null);
+
+        return res.status(200).json({
+            success: true,
+            message: "프로필 이미지가 삭제되었습니다."
+        });
+    } catch (error) {
+        console.error("deleteProfileImageHandler 에러:", error);
+        res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
+    }
+};
+
 
 export default {
     signup,
@@ -395,5 +438,7 @@ export default {
     resendPasswordResetCode: sendPasswordResetCode,
     getMyProfile,
     updateMyProfile,
-    withdrawUser
+    withdrawUser,
+    uploadProfileImageHandler,
+    deleteProfileImageHandler
 };
