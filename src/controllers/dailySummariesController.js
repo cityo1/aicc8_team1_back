@@ -46,6 +46,7 @@ export async function getDailySummary(req, res) {
 /**
  * GET /api/users/me/daily-summaries?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  * 날짜 범위 일별 집계 조회 (주간리포트 7일용)
+ * daily_summaries에 없는 날짜는 diary_entries 기반으로 실시간 집계 후 반환
  */
 export async function getDailySummaries(req, res) {
   try {
@@ -64,7 +65,23 @@ export async function getDailySummaries(req, res) {
     }
 
     const rows = await getSummariesInRange(userId, startDate, endDate);
-    const data = rows.map(formatSummary);
+    const existingByDate = Object.fromEntries(rows.map((r) => [r.summary_date, r]));
+
+    const data = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      let row = existingByDate[dateStr];
+      if (!row) {
+        try {
+          row = await summarizeDay(userId, dateStr);
+        } catch (e) {
+          console.error(`summarizeDay 실패 date=${dateStr}:`, e.message);
+        }
+      }
+      if (row) data.push(formatSummary(row));
+    }
 
     return res.json({
       success: true,

@@ -15,6 +15,7 @@ import { runWeeklyReportJob } from "../services/weeklyReportService.js";
 import { runGoalAchievementJob } from "../services/goalAchievementService.js";
 import { getNutritionGoals } from "../controllers/nutritionGoalsController.js";
 import { getDailySummary, getDailySummaries } from "../controllers/dailySummariesController.js";
+import { getTodayRecommend } from "../controllers/todayRecommendController.js";
 import { runDailySummariesJob } from "../services/dailySummariesService.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
@@ -200,3 +201,4 @@ settingsRouter.put("/me/notification-type-settings", requireAuth, updateNotifica
 settingsRouter.get("/me/nutrition-goals", requireAuth, getNutritionGoals);
 settingsRouter.get("/me/daily-summary", requireAuth, getDailySummary);
 settingsRouter.get("/me/daily-summaries", requireAuth, getDailySummaries);
+settingsRouter.get("/me/today-recommend", requireAuth, getTodayRecommend);
