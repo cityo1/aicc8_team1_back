@@ -124,6 +124,10 @@ router.post("/", upload.single("image"), async (req, res) => {
             servings = 1,
             servingSize = null,
             calories = null,
+            carbohydrate = null,
+            protein = null,
+            fat = null,
+            sugars = null,
             mealType = null,
             mealTime = null,
             memo = null,
@@ -179,14 +183,14 @@ router.post("/", upload.single("image"), async (req, res) => {
 
         if (foodRes.rows.length > 0) {
             const food = foodRes.rows[0];
-            // 제공량(servings)을 곱해서 snap_* 에 넣습니다. 단 사용자가 전송한 calories가 우선
+            // 제공량(servings)을 곱해서 snap_* 에 넣습니다. 사용자가 전송한 값(칼로리·영양소)이 우선
             snapData = {
                 snap_food_name: foodName || food.food_name || null,
                 snap_calories: calories != null ? Number(calories) : (food.calories != null ? (Number(food.calories) * s) : null),
-                snap_carbohydrate: food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null,
-                snap_protein: food.protein != null ? (Number(food.protein) * s) : null,
-                snap_fat: food.fat != null ? (Number(food.fat) * s) : null,
-                snap_sugars: food.sugars != null ? (Number(food.sugars) * s) : null,
+                snap_carbohydrate: carbohydrate != null ? Number(carbohydrate) : (food.carbohydrate != null ? (Number(food.carbohydrate) * s) : null),
+                snap_protein: protein != null ? Number(protein) : (food.protein != null ? (Number(food.protein) * s) : null),
+                snap_fat: fat != null ? Number(fat) : (food.fat != null ? (Number(food.fat) * s) : null),
+                snap_sugars: sugars != null ? Number(sugars) : (food.sugars != null ? (Number(food.sugars) * s) : null),
                 snap_sodium: food.sodium != null ? (Number(food.sodium) * s) : null,
                 snap_cholesterol: food.cholesterol != null ? (Number(food.cholesterol) * s) : null,
                 snap_saturated_fat: food.saturated_fat != null ? (Number(food.saturated_fat) * s) : null,
