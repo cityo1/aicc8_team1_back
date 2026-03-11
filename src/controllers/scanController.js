@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import * as scanModel from '../models/scanModel.js';
+import { refreshSummaryForMeal } from '../services/dailySummariesService.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -253,6 +254,10 @@ export async function saveDiary(req, res) {
       foods: mappedFoods,
       image_url: finalImageUrl
     });
+
+    refreshSummaryForMeal(user_id, mealTime || (savedEntries[0]?.meal_time)).catch((err) =>
+      console.error('daily_summaries 갱신 실패:', err.message)
+    );
 
     res.json({
       success: true,

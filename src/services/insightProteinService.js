@@ -1,5 +1,7 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getOrCreateGoals } from '../models/nutritionGoalsModel.js';
+import { insertDeficiencyAlert } from '../models/deficiencyAlertsModel.js';
 import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const DEFAULT_PROTEIN_TARGET = 50;  // g
@@ -21,16 +23,11 @@ async function getDailyProtein(userId, dateStr) {
 }
 
 /**
- * 목표 단백질 조회
+ * 목표 단백질 조회 (없으면 getOrCreateGoals로 자동 생성)
  */
 async function getProteinTarget(userId, dateStr) {
-  const res = await pool.query(
-    `SELECT target_protein FROM nutrition_goals
-     WHERE user_id = $1 AND target_date = $2::date
-     ORDER BY created_at DESC LIMIT 1`,
-    [userId, dateStr]
-  );
-  const v = res.rows[0]?.target_protein;
+  const goals = await getOrCreateGoals(userId, dateStr);
+  const v = goals?.target_protein;
   return v != null ? Number(v) : DEFAULT_PROTEIN_TARGET;
 }
 
@@ -77,12 +74,19 @@ export async function runInsightProteinJob() {
       if (await alreadySent(userId)) continue;
 
       const message = `오늘 목표 단백질까지 ${deficit}g 남았어요! 간식으로 삶은 계란이나 두유 어떠세요? 💪`;
-      await createNotification({
+      const notif = await createNotification({
         userId,
         type: 'insight_protein',
         title: '단백질 채우기',
         message,
       });
+      await insertDeficiencyAlert({
+        userId,
+        deficiencyType: 'PROTEIN',
+        currentValue: current,
+        targetValue: target,
+        notificationId: notif?.id,
+      }).catch((err) => console.error('deficiency_alerts INSERT 실패:', err.message));
       sent++;
     }
     return { sent };

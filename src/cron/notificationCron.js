@@ -7,6 +7,7 @@ import { runRecommendationTomorrowJob } from '../services/recommendationTomorrow
 import { runRecommendationMenuJob } from '../services/recommendationMenuService.js';
 import { runWeeklyReportJob } from '../services/weeklyReportService.js';
 import { runGoalAchievementJob } from '../services/goalAchievementService.js';
+import { runDailySummariesJob } from '../services/dailySummariesService.js';
 
 const TZ = 'Asia/Seoul';
 
@@ -24,6 +25,7 @@ function run(name, fn) {
 }
 
 async function runAllNotificationJobs() {
+  await run('daily-summaries', runDailySummariesJob)();
   await run('meal-nudge', runMealNudgeJob)();
   await run('streak-nudge', runStreakNudgeJob)();
   await run('insight-sugar-fat', runInsightSugarFatJob)();

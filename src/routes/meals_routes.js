@@ -1,5 +1,6 @@
 import express from "express";
 import { pool } from "../config/db.js";
+import { refreshSummaryForMeal } from "../services/dailySummariesService.js";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import path from "path";
@@ -235,7 +236,10 @@ router.post("/", upload.single("image"), async (req, res) => {
 
         const newEntry = result.rows[0];
 
-        // Format to perfectly match requested payload returning structure.
+        refreshSummaryForMeal(userId, mealTime || newEntry.meal_time).catch((err) =>
+          console.error("daily_summaries 갱신 실패:", err.message)
+        );
+
         return res.json({
             success: true,
             message: "식단 입력이 완료되었습니다.",

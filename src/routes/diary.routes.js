@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../config/db.js';
+import { refreshSummaryForMeal } from '../services/dailySummariesService.js';
 
 const router = express.Router();
 
@@ -351,7 +352,12 @@ router.patch('/:id', async (req, res) => {
         .json({ success: false, message: '수정할 기록을 찾을 수 없습니다.' });
     }
 
-    return res.json({ success: true, data: result.rows[0] });
+    const updated = result.rows[0];
+    refreshSummaryForMeal(updated.user_id, updated.meal_time).catch((err) =>
+      console.error('daily_summaries 갱신 실패:', err.message)
+    );
+
+    return res.json({ success: true, data: updated });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, message: err.message });
@@ -366,7 +372,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'DELETE FROM diary_entries WHERE id = $1 RETURNING id',
+      'DELETE FROM diary_entries WHERE id = $1 RETURNING id, user_id, meal_time',
       [id],
     );
 
@@ -376,10 +382,15 @@ router.delete('/:id', async (req, res) => {
         .json({ success: false, message: '삭제할 기록을 찾을 수 없습니다.' });
     }
 
+    const deleted = result.rows[0];
+    refreshSummaryForMeal(deleted.user_id, deleted.meal_time).catch((err) =>
+      console.error('daily_summaries 갱신 실패:', err.message)
+    );
+
     return res.json({
       success: true,
       message: '삭제 성공',
-      id: result.rows[0].id,
+      id: deleted.id,
     });
   } catch (err) {
     console.error(err);

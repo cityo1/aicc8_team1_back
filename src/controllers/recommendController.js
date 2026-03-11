@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 import { getRandomFoods, searchFoodsByKeywords, saveRecommendationResult } from '../models/recommendModel.js';
 import { findUserById } from '../models/userModel.js';
+import { getExcludedKeywords, filterFoodsByUser } from '../utils/allergyFilter.js';
 
 // OpenAI 클라이언트 초기화
 const openai = new OpenAI({
@@ -53,11 +54,11 @@ export const recommendFoodsByAI = async (req, res) => {
             return res.status(400).json({ success: false, message: "올바르지 않은 대화 요청입니다." });
         }
 
-        // 1. 사용자 신체 프로필 가져오기 (보다 정확한 AI 추천용 컨텍스트)
+        // 1. 사용자 신체 프로필 가져오기 (AI 컨텍스트 + 알레르기/식이제한 필터용)
         const user = await findUserById(userId);
         let userContext = "목표: 건강 유지";
         if (user) {
-            userContext = `사용자 목표: ${user.goals}, 식이 제한 사항: ${user.dietary_restrictions}, 키: ${user.height}cm, 체중: ${user.weight}kg.`;
+            userContext = `사용자 목표: ${user.goals}, 식이 제한: ${user.dietary_restrictions}, 알레르기: ${user.allergies || '없음'}, 키: ${user.height}cm, 체중: ${user.weight}kg.`;
         }
 
         // 2. OpenAI 채팅 호출 (키워드 추출 목적)
@@ -103,6 +104,10 @@ export const recommendFoodsByAI = async (req, res) => {
             console.log("키워드 매칭 실패. 랜덤 음식 반환");
             recommendedFoods = await getRandomFoods(3);
         }
+
+        // 알레르기·식이제한에 맞지 않는 음식 제외
+        const excluded = getExcludedKeywords(user || {});
+        recommendedFoods = filterFoodsByUser(recommendedFoods, excluded);
 
         // 최대 3개까지만 자르기
         recommendedFoods = recommendedFoods.slice(0, 3);
