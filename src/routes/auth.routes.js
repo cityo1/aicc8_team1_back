@@ -1,6 +1,7 @@
 import express from "express";
 import userController from "../controllers/userController.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
+import { uploadProfileImage } from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
@@ -153,6 +154,62 @@ router.get("/me", requireAuth, userController.getMyProfile);
  *     tags: [Auth]
  */
 router.put("/profile", requireAuth, userController.updateMyProfile);
+
+/**
+ * @swagger
+ * /api/auth/profile/image:
+ *   post:
+ *     summary: 사용자 프로필 이미지 업로드
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: 프로필 이미지 업로드 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 profileImage:
+ *                   type: string
+ *                   example: "/uploads/profile/user_123_1234567890.jpg"
+ */
+router.post("/profile/image", requireAuth, uploadProfileImage.single("profileImage"), userController.uploadProfileImageHandler);
+
+/**
+ * @swagger
+ * /api/auth/profile/image:
+ *   delete:
+ *     summary: 사용자 프로필 이미지 삭제
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: 프로필 이미지 삭제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "프로필 이미지가 삭제되었습니다."
+ */
+router.delete("/profile/image", requireAuth, userController.deleteProfileImageHandler);
 
 /**
  * @swagger
