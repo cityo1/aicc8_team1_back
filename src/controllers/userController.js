@@ -8,6 +8,8 @@ import {
     savePasswordResetToken, updateUserPassword,
     findUserById, updateProfile, updateProfileImage, deleteUser
 } from "../models/userModel.js";
+import { upsertGoals } from "../models/nutritionGoalsModel.js";
+import { calculateDailyNutritionGoals } from "../services/goalCalculationService.js";
 import { sendVerificationEmail } from "../services/emailService.js";
 
 // require('dotenv').config(); // Removed for ES module compatibility/redundancy
@@ -238,7 +240,7 @@ const resetPassword = async (req, res) => {
             return res.status(400).json({ message: "재설정 토큰과 새 비밀번호를 입력해주세요." });
         }
 
-        const poolQuery = await import("../config/db.js");
+        const poolQuery = await import("../../database/databaseConnect.js");
         const { rows } = await poolQuery.pool.query('SELECT * FROM password_resets WHERE reset_token = $1', [resetToken]);
 
         if (rows.length === 0) {
@@ -330,6 +332,17 @@ const updateMyProfile = async (req, res) => {
 
         if (!updatedUser) {
             return res.status(404).json({ success: false, message: "사용자를 찾을 수 없습니다." });
+        }
+
+        // 키/몸무게 변경 시 nutrition_goals 갱신 (Task 3)
+        if (height != null || weight != null) {
+            try {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const goals = calculateDailyNutritionGoals(updatedUser);
+                await upsertGoals(userId, todayStr, goals);
+            } catch (err) {
+                console.error("nutrition_goals 갱신 실패:", err);
+            }
         }
 
         return res.status(200).json({
