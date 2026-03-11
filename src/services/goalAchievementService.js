@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { createNotification } from '../models/notificationsModel.js';
 import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 

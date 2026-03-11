@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 /**
  * 사용자 식사 패턴 조회

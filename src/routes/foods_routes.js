@@ -1,7 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import { parse } from 'csv-parse/sync';
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 const router = express.Router();
 

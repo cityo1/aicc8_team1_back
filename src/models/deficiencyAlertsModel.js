@@ -2,7 +2,7 @@
  * deficiency_alerts 테이블 연동
  * Task 8: 결핍 감지 시 기록
  */
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

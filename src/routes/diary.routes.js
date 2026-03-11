@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { refreshSummaryForMeal } from '../services/dailySummariesService.js';
 
 const router = express.Router();

@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { getOrCreateGoals } from '../models/nutritionGoalsModel.js';
 import { insertDeficiencyAlert } from '../models/deficiencyAlertsModel.js';
 

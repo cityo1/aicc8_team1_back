@@ -2,7 +2,7 @@
  * Task 4: daily_summaries 일별 집계 서비스
  * diary_entries 기반 일별 영양소 집계, score·goal_achieved 계산 후 UPSERT
  */
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getOrCreateGoals } from '../models/nutritionGoalsModel.js';
 

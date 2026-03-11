@@ -24,16 +24,13 @@ import notificationsRouter, {
 } from './src/routes/notifications.routes.js';
 import { startNotificationCron } from './src/cron/notificationCron.js';
 import recommendRoutes from './src/routes/recommend.routes.js';
-// import { pool } from "./src/config/db.js";
 import swaggerUi from 'swagger-ui-express';
-import swaggerSpec from './src/config/swagger.js';
+import swaggerSpec from './database/swagger.js';
 
 const app = express();
 
 // Set uploads directory as static route
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// test
 
 app.use(
   cors({
@@ -63,7 +60,6 @@ app.use('/api/foods', foodsRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/recommend', recommendRoutes);
-app.use('/api/recommendation', recommendRoutes);
 
 // app.get("/api/db/ping", async (req, res) => {
 //   try {

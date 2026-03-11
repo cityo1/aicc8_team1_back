@@ -240,7 +240,7 @@ const resetPassword = async (req, res) => {
             return res.status(400).json({ message: "재설정 토큰과 새 비밀번호를 입력해주세요." });
         }
 
-        const poolQuery = await import("../config/db.js");
+        const poolQuery = await import("../../database/databaseConnect.js");
         const { rows } = await poolQuery.pool.query('SELECT * FROM password_resets WHERE reset_token = $1', [resetToken]);
 
         if (rows.length === 0) {

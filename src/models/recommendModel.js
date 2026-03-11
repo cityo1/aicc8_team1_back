@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 /**
  * DB에서 지정된 개수만큼 랜덤하게 음식을 가져옵니다.

@@ -2,7 +2,7 @@
  * daily_summaries 테이블 조회
  * Task 10: 일별 집계 조회 API
  */
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 /**
  * 특정 날짜 daily_summaries 조회

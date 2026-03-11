@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS community_reports CASCADE;
 DROP TABLE IF EXISTS community_likes CASCADE;
 DROP TABLE IF EXISTS community_posts CASCADE;
 DROP TABLE IF EXISTS deficiency_alerts CASCADE;
+DROP TABLE IF EXISTS notification_type_settings CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS recommendation_feedback CASCADE;
 DROP TABLE IF EXISTS recommendations CASCADE;
@@ -206,6 +207,17 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     rating INTEGER CHECK (rating BETWEEN 1 AND 5),
     feedback_text TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10.5. notification_type_settings (알림 유형별 사용자 설정) users 1:N
+CREATE TABLE IF NOT EXISTS notification_type_settings (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    enabled BOOLEAN DEFAULT true,
+    config JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, type)
 );
 
 -- 11. notifications (알림) users 1:N
