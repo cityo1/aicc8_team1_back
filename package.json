@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.js",
-    "db:init": "node database/table.js",
+    "db:init": "node database/tableReset.js",
     "tm:init": "task-master init"
   },
   "keywords": [],

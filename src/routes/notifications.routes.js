@@ -13,6 +13,9 @@ import { runRecommendationTomorrowJob } from "../services/recommendationTomorrow
 import { runRecommendationMenuJob } from "../services/recommendationMenuService.js";
 import { runWeeklyReportJob } from "../services/weeklyReportService.js";
 import { runGoalAchievementJob } from "../services/goalAchievementService.js";
+import { getNutritionGoals } from "../controllers/nutritionGoalsController.js";
+import { getDailySummary, getDailySummaries } from "../controllers/dailySummariesController.js";
+import { runDailySummariesJob } from "../services/dailySummariesService.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -151,6 +154,20 @@ router.post("/jobs/weekly-report", cronAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/notifications/jobs/daily-summaries
+ * 전일 diary_entries가 있는 사용자들의 daily_summaries 갱신
+ */
+router.post("/jobs/daily-summaries", cronAuth, async (req, res) => {
+  try {
+    const result = await runDailySummariesJob();
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("daily-summaries job 에러:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
  * POST /api/notifications/jobs/goal-achievement
  * 목표 달성 축하 알림 (월요일 08:00~10:00)
  */
@@ -180,3 +197,6 @@ settingsRouter.get("/me/meal-pattern", requireAuth, getPattern);
 settingsRouter.put("/me/meal-pattern", requireAuth, updatePattern);
 settingsRouter.get("/me/notification-type-settings", requireAuth, getNotificationTypeSettings);
 settingsRouter.put("/me/notification-type-settings", requireAuth, updateNotificationTypeSettings);
+settingsRouter.get("/me/nutrition-goals", requireAuth, getNutritionGoals);
+settingsRouter.get("/me/daily-summary", requireAuth, getDailySummary);
+settingsRouter.get("/me/daily-summaries", requireAuth, getDailySummaries);

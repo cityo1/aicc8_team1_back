@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 /**
  * 이메일로 사용자 조회

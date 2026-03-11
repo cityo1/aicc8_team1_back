@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { createNotification } from '../models/notificationsModel.js';
 import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
@@ -46,12 +46,13 @@ async function getConsecutiveStreak(userId) {
 }
 
 /**
- * 해당 마일스톤 알림 이미 발송했는지
+ * 해당 마일스톤 알림 이미 발송했는지 (오늘 기준, mealNudgeService 패턴)
  */
 async function alreadySentStreak(userId, title) {
   const res = await pool.query(
     `SELECT 1 FROM notifications
      WHERE user_id = $1 AND type = 'streak' AND title = $2
+       AND (created_at AT TIME ZONE 'Asia/Seoul')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
      LIMIT 1`,
     [userId, title]
   );

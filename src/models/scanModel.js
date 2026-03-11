@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

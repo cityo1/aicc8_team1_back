@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../database/databaseConnect.js';
 
 const NOTIFICATION_TYPES = [
   'meal_nudge',
