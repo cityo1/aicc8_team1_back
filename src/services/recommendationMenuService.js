@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 const SEOUL = { lat: 37.5665, lon: 126.978 };
@@ -73,18 +74,11 @@ async function alreadySent(userId, dateStr) {
 
 /**
  * 메뉴 고민 해결 알림 배치 (날씨 연동)
- * - 점심·저녁 메뉴 고민 시간대: 11:00~12:00, 17:00~18:00
+ * - 사용자 설정 time1(점심 전), time2(저녁 전) ±30분 창에 실행
  */
-function isMealDecisionWindow() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const total = now.getHours() * 60 + now.getMinutes();
-  return (total >= 11 * 60 && total < 12 * 60) || (total >= 17 * 60 && total < 18 * 60);
-}
-
 export async function runRecommendationMenuJob() {
-  if (!isMealDecisionWindow()) {
-    return { sent: 0, reason: 'not_meal_decision_window' };
-  }
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   let weather = { code: 0, temp: 15 };
   try {
@@ -102,11 +96,11 @@ export async function runRecommendationMenuJob() {
   let sent = 0;
 
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('recommendation_menu');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      const inWindow = isInTimeWindow(config.time1, currentMinutes) || isInTimeWindow(config.time2, currentMinutes);
+      if (!inWindow) continue;
       if (await alreadySent(userId, dateStr)) continue;
       await createNotification({
         userId,

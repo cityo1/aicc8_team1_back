@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 const MILESTONES = [
   { days: 7, title: '연속 기록 응원 - 7일', message: "와, 7일 연속 기록이에요! 꾸준함이 영양 습관을 바꿔요. 다음 주도 화이팅! 🔥" },
@@ -61,15 +62,18 @@ async function alreadySentStreak(userId, title) {
  * 연속 기록 응원 알림 배치
  * - 어제까지 연속 N일 아침/점심/저녁 모두 기록한 사용자
  * - 3일, 7일 마일스톤 도달 시 1회만 발송
+ * - 사용자 설정 time ±30분 창에만 실행 (기본 23:00)
  */
 export async function runStreakNudgeJob() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
   let sent = 0;
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('streak');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      if (!isInTimeWindow(config.time, currentMinutes)) continue;
       const streak = await getConsecutiveStreak(userId);
       for (const m of MILESTONES) {
         if (streak >= m.days) {

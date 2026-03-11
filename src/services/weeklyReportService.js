@@ -1,15 +1,6 @@
 import { pool } from '../config/db.js';
 import { createNotification } from '../models/notificationsModel.js';
-
-/**
- * 월요일 08:00~10:00 KST
- */
-function isMondayMorning() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const isMon = now.getDay() === 1;
-  const total = now.getHours() * 60 + now.getMinutes();
-  return isMon && total >= 8 * 60 && total < 10 * 60;
-}
+import { getUsersConfigForType, isInTimeWindow } from '../models/notificationTypeSettingsModel.js';
 
 /**
  * 주간 영양 점수 (0~100)
@@ -63,11 +54,12 @@ async function alreadySentThisWeek(userId, mondayStr) {
 
 /**
  * 주간 리포트 알림 배치
+ * - 사용자 설정 dayOfWeek(기본 월), time ±30분 창에 실행
  */
 export async function runWeeklyReportJob() {
-  if (!isMondayMorning()) {
-    return { sent: 0, reason: 'not_monday_morning' };
-  }
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const dayOfWeek = now.getDay(); // 0=일, 1=월, ...
 
   const nowRes = await pool.query(
     `SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS today`
@@ -91,11 +83,12 @@ export async function runWeeklyReportJob() {
   let sent = 0;
 
   try {
-    const usersRes = await pool.query(
-      `SELECT id FROM users WHERE receive_notifications = true AND deleted_at IS NULL`
-    );
+    const usersWithConfig = await getUsersConfigForType('weekly_report');
 
-    for (const { id: userId } of usersRes.rows) {
+    for (const { userId, config } of usersWithConfig) {
+      const targetDay = Number(config.dayOfWeek ?? 1); // 기본 월요일 (1=월)
+      const inWindow = dayOfWeek === targetDay && isInTimeWindow(config.time, currentMinutes);
+      if (!inWindow) continue;
       if (await alreadySentThisWeek(userId, thisMondayStr)) continue;
 
       const [lastScore, prevScore] = await Promise.all([
