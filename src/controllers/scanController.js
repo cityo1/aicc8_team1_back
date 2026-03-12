@@ -123,8 +123,7 @@ export async function analyzeFood(req, res) {
       });
     }
 
-    const base64 = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
+    const imageUrl = req.file.location; // S3 버킷에 저장된 결과 URL
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -136,7 +135,7 @@ export async function analyzeFood(req, res) {
             {
               type: 'image_url',
               image_url: {
-                url: `data:${mimeType};base64,${base64}`,
+                url: imageUrl,
               },
             },
           ],
@@ -165,6 +164,7 @@ export async function analyzeFood(req, res) {
 
     res.json({
       success: true,
+      imageUrl: imageUrl, // 업로드된 S3 이미지 URL도 프론트에 반환
       foods,
       totalCalories: Math.round(totalCalories),
     });
@@ -181,7 +181,7 @@ export async function analyzeFood(req, res) {
 /**
  * POST /api/scan/save-ai - AI 분석 결과 저장 (ai_scans)
  * FormData: image(파일), user_id, scan_result(JSON 문자열)
- * 이미지는 uploads 폴더에 저장되고 DB에는 /uploads/파일명 경로만 저장
+ * 이미지는 S3에 저장되고 DB에는 S3 URL 전체가 저장
  */
 export async function saveAi(req, res) {
   try {
@@ -195,7 +195,7 @@ export async function saveAi(req, res) {
       return res.status(400).json({ success: false, message: '이미지 파일(image)이 필요합니다.' });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = req.file.location; // S3에서 반환된 전체 URL
 
     const scanResultObj = typeof scan_result === 'string' ? JSON.parse(scan_result) : scan_result;
     const saved = await scanModel.saveAiScanData(user_id, imageUrl, scanResultObj);
@@ -219,13 +219,24 @@ export async function saveAi(req, res) {
  */
 export async function saveDiary(req, res) {
   try {
-    const { user_id, ai_scan_id, meal_type, mealTime, foods, image_url } = req.body;
+    const { user_id, ai_scan_id, meal_type, mealTime, image_url } = req.body;
+    let foods = req.body.foods;
+
+    // formdata로 넘기면 foods가 문자열(string)로 올 수 있으므로 파싱
+    if (typeof foods === 'string') {
+      try {
+        foods = JSON.parse(foods);
+      } catch(e) {
+        return res.status(400).json({ success: false, message: 'foods 형식이 올바르지 않은 JSON 문자열입니다.' });
+      }
+    }
 
     if (!user_id || !meal_type || !foods || !Array.isArray(foods)) {
       return res.status(400).json({ success: false, message: '필수 데이터(user_id, meal_type, foods)가 누락되었습니다.' });
     }
 
-    let finalImageUrl = image_url;
+    // 새로 업로드된 이미지가 있으면 그 위치를 사용, 없으면 전달받은 기존 image_url 사용
+    let finalImageUrl = req.file ? req.file.location : image_url;
 
     // 만약 프론트에서 image_url을 보내지 않고 ai_scan_id만 넘겼다면 DB에서 조회해서 사용
     if (ai_scan_id && !finalImageUrl) {
