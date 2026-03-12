@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS community_reports CASCADE;
 DROP TABLE IF EXISTS community_likes CASCADE;
 DROP TABLE IF EXISTS community_posts CASCADE;
 DROP TABLE IF EXISTS deficiency_alerts CASCADE;
+DROP TABLE IF EXISTS notification_type_settings CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS recommendation_feedback CASCADE;
 DROP TABLE IF EXISTS recommendations CASCADE;
@@ -15,6 +16,7 @@ DROP TABLE IF EXISTS foods CASCADE;
 DROP TABLE IF EXISTS user_settings CASCADE;
 DROP TABLE IF EXISTS favorites CASCADE;
 DROP TABLE IF EXISTS meal_logs CASCADE;
+DROP TABLE IF EXISTS password_resets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- ✅ 확장 설치 불가 환경: DB에서 UUID 자동생성하지 않음
@@ -28,21 +30,43 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(50) NOT NULL,
     profile_image_url VARCHAR(255),
+    gender VARCHAR(20),
+    age_group VARCHAR(20),
+    height NUMERIC(5,2),
+    weight NUMERIC(5,2),
+    goals JSONB DEFAULT '[]'::jsonb,
+    dietary_restrictions JSONB DEFAULT '[]'::jsonb,
+    receive_notifications BOOLEAN DEFAULT true,  -- 기존 설정에서 이동
+    eating_habits TEXT,                          -- 기존 설정에서 이동
+    allergies TEXT[],                            -- 기존 설정에서 이동
+    breakfast_time TIME DEFAULT '08:00',         -- meal_nudge 아침 알림 시간
+    lunch_time TIME DEFAULT '12:30',             -- meal_nudge 점심 알림 시간
+    dinner_time TIME DEFAULT '19:00',            -- meal_nudge 저녁 알림 시간
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),        -- 기존 설정에서 이동
     deleted_at TIMESTAMPTZ
 );
 
--- 2. user_settings (사용자 설정) 1:1
-CREATE TABLE IF NOT EXISTS user_settings (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    receive_notifications BOOLEAN DEFAULT true,
-    eating_habits TEXT,
-    allergies TEXT[],
-    height NUMERIC(5,2),
-    weight NUMERIC(5,2),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+-- 1.5. password_resets (비밀번호 재설정)
+CREATE TABLE IF NOT EXISTS password_resets (
+    email VARCHAR(255) PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+    code VARCHAR(10),
+    reset_token VARCHAR(255),
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- -- 2. user_settings (사용자 설정) 1:1
+-- CREATE TABLE IF NOT EXISTS user_settings (
+--     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+--     receive_notifications BOOLEAN DEFAULT true,
+--     eating_habits TEXT,
+--     allergies TEXT[],
+--     height NUMERIC(5,2),
+--     weight NUMERIC(5,2),
+--     created_at TIMESTAMPTZ DEFAULT NOW(),
+--     updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
 
 -- 3. foods (식품 DB)
 CREATE TABLE IF NOT EXISTS foods (
@@ -60,11 +84,6 @@ CREATE TABLE IF NOT EXISTS foods (
     cholesterol NUMERIC,
     saturated_fat NUMERIC,
     trans_fat NUMERIC,
-    calcium NUMERIC,
-    iron NUMERIC,
-    potassium NUMERIC,
-    vitamin_a NUMERIC,
-    vitamin_c NUMERIC,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -105,7 +124,7 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     meal_time TIMESTAMPTZ NOT NULL,
     food_code VARCHAR(50) REFERENCES foods(food_code) ON DELETE SET NULL,
     custom_food_id UUID REFERENCES custom_foods(id) ON DELETE SET NULL,
-    amount NUMERIC DEFAULT 1,
+    serving_size NUMERIC,
     snap_food_name VARCHAR(255),
     snap_calories NUMERIC,
     snap_carbohydrate NUMERIC,
@@ -116,6 +135,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     snap_cholesterol NUMERIC,
     snap_saturated_fat NUMERIC,
     snap_trans_fat NUMERIC,
+    image_url TEXT,
+    memo TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
@@ -186,6 +207,17 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     rating INTEGER CHECK (rating BETWEEN 1 AND 5),
     feedback_text TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10.5. notification_type_settings (알림 유형별 사용자 설정) users 1:N
+CREATE TABLE IF NOT EXISTS notification_type_settings (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    enabled BOOLEAN DEFAULT true,
+    config JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, type)
 );
 
 -- 11. notifications (알림) users 1:N
