@@ -230,7 +230,7 @@ export async function saveAi(req, res) {
 export async function saveDiary(req, res) {
   try {
     const userId = req.body.user_id || req.user?.id;
-    let { ai_scan_id, meal_type, mealTime, image_url } = req.body;
+    let { ai_scan_id, meal_type, mealTime, image_url, scan_result } = req.body;
     let foods = req.body.foods;
 
     if (!userId) {
@@ -241,9 +241,9 @@ export async function saveDiary(req, res) {
     let finalImageUrl = req.file ? req.file.location : image_url;
     let finalAiScanId = ai_scan_id;
 
-    if (req.file && (!foods || (Array.isArray(foods) && foods.length === 0) || foods === '[]')) {
+    if (req.file && !scan_result && (!foods || (Array.isArray(foods) && foods.length === 0) || foods === '[]')) {
       console.log('이미지만 전송됨: AI 자동 분석 시작...');
-      
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -262,13 +262,38 @@ export async function saveDiary(req, res) {
       try {
         const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
         foods = JSON.parse(jsonStr);
-        
+
         // AI 스캔 이력도 자동으로 남김
         const savedScan = await scanModel.saveAiScanData(userId, finalImageUrl, foods);
         finalAiScanId = savedScan.id;
       } catch (e) {
         console.error('AI 자동 분석 실패:', text);
         return res.status(500).json({ success: false, message: 'AI 분석 결과를 생성할 수 없습니다.' });
+      }
+    }
+
+    // 2. scan_result가 전송된 경우 (프론트 saveAiScan 호출) - ai_scans에 저장하고 ai_scan_id 생성
+    if (scan_result && !finalAiScanId && req.file) {
+      try {
+        const scanResultObj = typeof scan_result === 'string' ? JSON.parse(scan_result) : scan_result;
+        const savedScan = await scanModel.saveAiScanData(userId, finalImageUrl, scanResultObj);
+        finalAiScanId = savedScan.id;
+        console.log('scan_result로 ai_scans 저장 완료, ai_scan_id:', finalAiScanId);
+
+        // scan_result만 보낸 경우 (foods 없음) - ai_scans 저장만 하고 바로 응답
+        if (!foods || foods === '[]' || (Array.isArray(foods) && foods.length === 0)) {
+          return res.json({
+            success: true,
+            message: 'AI 스캔 결과가 저장되었습니다.',
+            ai_scan_id: finalAiScanId,
+            data: {
+              ai_scan_id: finalAiScanId,
+              image_url: finalImageUrl
+            }
+          });
+        }
+      } catch (e) {
+        console.error('scan_result 저장 실패:', e);
       }
     }
 
@@ -329,7 +354,9 @@ export async function saveDiary(req, res) {
     res.json({
       success: true,
       message: '저장되었습니다.',
+      ai_scan_id: finalAiScanId || null,
       data: {
+        ai_scan_id: finalAiScanId || null,
         meal_type,
         mealTime: savedEntries.length > 0 ? savedEntries[0].meal_time : mealTime,
         foods: foods
