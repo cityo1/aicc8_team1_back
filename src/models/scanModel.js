@@ -31,7 +31,8 @@ export const saveDiaryEntries = async ({ user_id, ai_scan_id, meal_type, mealTim
     const results = [];
     const timeToUse = mealTime || new Date().toISOString();
 
-    for (const food of foods) {
+    for (let i = 0; i < foods.length; i++) {
+        const food = foods[i];
         const query = `
             INSERT INTO diary_entries (
                 id, user_id, ai_scan_id, meal_type, meal_time,
@@ -54,7 +55,7 @@ export const saveDiaryEntries = async ({ user_id, ai_scan_id, meal_type, mealTim
             food.snap_fat || 0,
             food.snap_sugars || 0,
             food.serving_size || 0,
-            image_url || null
+            i === 0 ? (image_url || null) : null  // 첫 번째 음식에만 이미지 URL 저장
         ];
         const { rows } = await pool.query(query, values);
         results.push(rows[0]);

@@ -42,7 +42,7 @@ router.post('/food', uploadDisk.single('image'), scanController.analyzeFood);
 router.post('/food/reanalyze', express.json(), scanController.reanalyzeFood);
 
 // AI 분석 결과 저장 - FormData(image, user_id, scan_result) → uploads에 저장, DB에 경로 저장
-router.post('/save-ai', requireAuth, uploadDisk.single('image'), scanController.saveAi);
+// router.post('/save-ai', requireAuth, uploadDisk.single('image'), scanController.saveAi);
 router.post('/save-diary', requireAuth, uploadDisk.single('image'), scanController.saveDiary);
 
 export default router;
