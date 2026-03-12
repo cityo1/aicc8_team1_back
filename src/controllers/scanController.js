@@ -185,27 +185,36 @@ export async function analyzeFood(req, res) {
  */
 export async function saveAi(req, res) {
   try {
-    const { user_id, scan_result } = req.body;
+    const userId = req.body.user_id || req.user?.id;
+    const { scan_result } = req.body;
 
-    if (!user_id || !scan_result) {
-      return res.status(400).json({ success: false, message: '필수 데이터(user_id, scan_result)가 누락되었습니다.' });
+    const missingFields = [];
+    if (!userId) missingFields.push('user_id');
+    if (!scan_result) missingFields.push('scan_result');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `필수 데이터(${missingFields.join(', ')})가 누락되었습니다.`,
+        received: { user_id: userId, scan_result_exists: !!scan_result }
+      });
     }
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: '이미지 파일(image)이 필요합니다.' });
     }
 
-    const imageUrl = req.file.location; // S3에서 반환된 전체 URL
-
+    const imageUrl = req.file.location;
     const scanResultObj = typeof scan_result === 'string' ? JSON.parse(scan_result) : scan_result;
-    const saved = await scanModel.saveAiScanData(user_id, imageUrl, scanResultObj);
+    
+    const saved = await scanModel.saveAiScanData(userId, imageUrl, scanResultObj);
 
     res.json({
       success: true,
       message: '저장되었습니다.',
       data: {
         scan_result: saved.scan_result,
-        ai_scan_id: saved.id // 3.4 저장 시 연동을 위해 id값을 넘겨줌
+        ai_scan_id: saved.id
       }
     });
   } catch (error) {
@@ -216,31 +225,78 @@ export async function saveAi(req, res) {
 
 /**
  * POST /api/scan/save-diary - 식단 기록 저장 (diary_entries)
+ * Smart version: 이미지 하나만 보내도 분석부터 저장까지 자동 처리
  */
 export async function saveDiary(req, res) {
   try {
-    const { user_id, ai_scan_id, meal_type, mealTime, image_url } = req.body;
+    const userId = req.body.user_id || req.user?.id;
+    let { ai_scan_id, meal_type, mealTime, image_url } = req.body;
     let foods = req.body.foods;
 
-    // formdata로 넘기면 foods가 문자열(string)로 올 수 있으므로 파싱
+    if (!userId) {
+      return res.status(401).json({ success: false, message: '사용자 인증이 필요합니다.' });
+    }
+
+    // 1. 이미지가 업로드되었는데 foods(식단 정보)가 없으면 직접 AI 분석 실행
+    let finalImageUrl = req.file ? req.file.location : image_url;
+    let finalAiScanId = ai_scan_id;
+
+    if (req.file && (!foods || (Array.isArray(foods) && foods.length === 0) || foods === '[]')) {
+      console.log('이미지만 전송됨: AI 자동 분석 시작...');
+      
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT },
+              { type: 'image_url', image_url: { url: finalImageUrl } },
+            ],
+          },
+        ],
+        max_tokens: 1024,
+      });
+
+      const text = completion.choices[0]?.message?.content?.trim() || '[]';
+      try {
+        const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
+        foods = JSON.parse(jsonStr);
+        
+        // AI 스캔 이력도 자동으로 남김
+        const savedScan = await scanModel.saveAiScanData(userId, finalImageUrl, foods);
+        finalAiScanId = savedScan.id;
+      } catch (e) {
+        console.error('AI 자동 분석 실패:', text);
+        return res.status(500).json({ success: false, message: 'AI 분석 결과를 생성할 수 없습니다.' });
+      }
+    }
+
+    // foods 파싱 (문자열로 올 경우)
     if (typeof foods === 'string') {
       try {
         foods = JSON.parse(foods);
       } catch(e) {
-        return res.status(400).json({ success: false, message: 'foods 형식이 올바르지 않은 JSON 문자열입니다.' });
+        return res.status(400).json({ success: false, message: 'foods 형식이 올바르지 않습니다.' });
       }
     }
 
-    if (!user_id || !meal_type || !foods || !Array.isArray(foods)) {
-      return res.status(400).json({ success: false, message: '필수 데이터(user_id, meal_type, foods)가 누락되었습니다.' });
+    if (!foods || !Array.isArray(foods) || foods.length === 0) {
+      return res.status(400).json({ success: false, message: '저장할 음식 정보(foods)가 없습니다.' });
     }
 
-    // 새로 업로드된 이미지가 있으면 그 위치를 사용, 없으면 전달받은 기존 image_url 사용
-    let finalImageUrl = req.file ? req.file.location : image_url;
+    // 2. meal_type이 없으면 현재 시간 기준으로 자동 설정
+    if (!meal_type) {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 10) meal_type = 'breakfast';
+      else if (hour >= 11 && hour < 15) meal_type = 'lunch';
+      else if (hour >= 17 && hour < 21) meal_type = 'dinner';
+      else meal_type = 'snack';
+    }
 
     // 만약 프론트에서 image_url을 보내지 않고 ai_scan_id만 넘겼다면 DB에서 조회해서 사용
-    if (ai_scan_id && !finalImageUrl) {
-      const scanData = await scanModel.getAiScanById(ai_scan_id);
+    if (finalAiScanId && !finalImageUrl) {
+      const scanData = await scanModel.getAiScanById(finalAiScanId);
       if (scanData) {
         finalImageUrl = scanData.image_url;
       }
@@ -248,25 +304,25 @@ export async function saveDiary(req, res) {
 
     // 프론트 형식(name, calories, carbohydrate...) → 모델 형식(snap_food_name, snap_calories...) 변환
     const mappedFoods = foods.map((f) => ({
-      snap_food_name: f.snap_food_name ?? f.name,
-      snap_calories: f.snap_calories ?? f.calories ?? 0,
-      snap_carbohydrate: f.snap_carbohydrate ?? f.carbohydrate ?? 0,
-      snap_protein: f.snap_protein ?? f.protein ?? 0,
-      snap_fat: f.snap_fat ?? f.fat ?? 0,
-      snap_sugars: f.snap_sugars ?? f.sugars ?? 0,
-      serving_size: f.serving_size ?? f.amount ?? 0,
+      snap_food_name: f.name || f.snap_food_name,
+      snap_calories: f.calories ?? f.snap_calories ?? 0,
+      snap_carbohydrate: f.carbohydrate ?? f.snap_carbohydrate ?? 0,
+      snap_protein: f.protein ?? f.snap_protein ?? 0,
+      snap_fat: f.fat ?? f.snap_fat ?? 0,
+      snap_sugars: f.sugars ?? f.snap_sugars ?? 0,
+      serving_size: f.amount ?? f.serving_size ?? 0,
     }));
 
     const savedEntries = await scanModel.saveDiaryEntries({
-      user_id,
-      ai_scan_id,
+      user_id: userId,
+      ai_scan_id: finalAiScanId,
       meal_type,
       mealTime,
       foods: mappedFoods,
       image_url: finalImageUrl
     });
 
-    refreshSummaryForMeal(user_id, mealTime || (savedEntries[0]?.meal_time)).catch((err) =>
+    refreshSummaryForMeal(userId, mealTime || (savedEntries[0]?.meal_time)).catch((err) =>
       console.error('daily_summaries 갱신 실패:', err.message)
     );
 
@@ -274,7 +330,9 @@ export async function saveDiary(req, res) {
       success: true,
       message: '저장되었습니다.',
       data: {
-        mealTime: savedEntries.length > 0 ? savedEntries[0].meal_time : mealTime
+        meal_type,
+        mealTime: savedEntries.length > 0 ? savedEntries[0].meal_time : mealTime,
+        foods: foods
       }
     });
 
