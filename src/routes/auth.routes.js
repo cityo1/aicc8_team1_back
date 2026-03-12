@@ -43,8 +43,8 @@ const router = express.Router();
  *       409:
  *         description: Email already exists
  */
-router.post("/register", userController.signup);
-router.post("/signup", userController.signup);
+router.post("/register", uploadProfileImage.single("profile_image"), userController.signup);
+router.post("/signup", uploadProfileImage.single("profile_image"), userController.signup);
 
 /**
  * @swagger

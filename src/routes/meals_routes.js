@@ -3,23 +3,22 @@ import { pool } from "../../database/databaseConnect.js";
 import { refreshSummaryForMeal } from "../services/dailySummariesService.js";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
+import multerS3 from "multer-s3";
 import path from "path";
+import s3 from "../config/s3.js";
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-    }
-});
-
 const upload = multer({
-    storage: storage,
+    storage: multerS3({
+        s3: s3,
+        bucket: process.env.AWS_S3_BUCKET,
+        key: function (req, file, cb) {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            const ext = path.extname(file.originalname);
+            cb(null, `meals/${file.fieldname}-${uniqueSuffix}${ext}`);
+        }
+    }),
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
@@ -135,7 +134,7 @@ router.post("/", upload.single("image"), async (req, res) => {
         } = req.body;
 
         if (req.file) {
-            imageUrl = `/uploads/${req.file.filename}`;
+            imageUrl = req.file.location; // S3 버킷의 파일 URL
         }
 
         // 1) 필수값 체크

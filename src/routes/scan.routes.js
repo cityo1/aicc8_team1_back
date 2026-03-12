@@ -1,7 +1,10 @@
 import express from 'express';
 import multer from 'multer';
+import multerS3 from 'multer-s3';
 import path from 'path';
+import s3 from '../config/s3.js';
 import * as scanController from '../controllers/scanController.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -16,17 +19,17 @@ const uploadMemory = multer({
   },
 });
 
-// save-ai용: uploads 폴더에 저장, DB에는 경로만 저장
-const diskStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, 'scan-' + uniqueSuffix + ext);
-  },
-});
+// save-ai용: S3 버킷에 저장, DB에는 S3 URL 저장
 const uploadDisk = multer({
-  storage: diskStorage,
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.AWS_S3_BUCKET,
+    key: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const ext = path.extname(file.originalname) || '.jpg';
+      cb(null, `scans/scan-${uniqueSuffix}${ext}`);
+    }
+  }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];
@@ -35,11 +38,11 @@ const uploadDisk = multer({
   },
 });
 
-router.post('/food', uploadMemory.single('image'), scanController.analyzeFood);
+router.post('/food', uploadDisk.single('image'), scanController.analyzeFood);
 router.post('/food/reanalyze', express.json(), scanController.reanalyzeFood);
 
 // AI 분석 결과 저장 - FormData(image, user_id, scan_result) → uploads에 저장, DB에 경로 저장
-router.post('/save-ai', uploadDisk.single('image'), scanController.saveAi);
-router.post('/save-diary', express.json(), scanController.saveDiary);
+router.post('/save-ai', requireAuth, uploadDisk.single('image'), scanController.saveAi);
+router.post('/save-diary', requireAuth, uploadDisk.single('image'), scanController.saveDiary);
 
 export default router;

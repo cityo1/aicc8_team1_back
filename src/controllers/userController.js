@@ -11,17 +11,23 @@ import {
 import { upsertGoals } from "../models/nutritionGoalsModel.js";
 import { calculateDailyNutritionGoals } from "../services/goalCalculationService.js";
 import { sendVerificationEmail } from "../services/emailService.js";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import s3 from "../config/s3.js";
 
 // require('dotenv').config(); // Removed for ES module compatibility/redundancy
 
 const signup = async (req, res) => {
     // ... existing code ...
     try {
-        const {
+        let {
             email, password, nickname, profile_image_url,
             gender, age_group, height, weight, goals, dietary_restrictions,
             receive_notifications, eating_habits, allergies
         } = req.body;
+
+        if (req.file) {
+            profile_image_url = req.file.location; // S3 전체 URL 활용
+        }
 
         // 필수 값 검증
         if (!email || !password || !nickname) {
@@ -406,7 +412,7 @@ const uploadProfileImageHandler = async (req, res) => {
             return res.status(400).json({ success: false, message: "이미지 파일이 필요합니다." });
         }
 
-        const profileImageUrl = `/uploads/profile/${req.file.filename}`;
+        const profileImageUrl = req.file.location;
         await updateProfileImage(userId, profileImageUrl);
 
         return res.status(200).json({
@@ -424,6 +430,41 @@ const deleteProfileImageHandler = async (req, res) => {
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ success: false, message: "인증 정보가 없습니다." });
+        }
+        
+        const user = await findUserById(userId);
+        if (user && user.profile_image_url) {
+            try {
+                let objectKey = null;
+                const urlStr = user.profile_image_url;
+
+                if (urlStr.includes('amazonaws.com/')) {
+                    // S3 기본 도메인인 경우
+                    objectKey = decodeURIComponent(urlStr.split('amazonaws.com/')[1]);
+                    // Path-style 접근 (버킷명이 경로에 포함되는 경우) 대응
+                    if (process.env.AWS_S3_BUCKET && objectKey.startsWith(process.env.AWS_S3_BUCKET + '/')) {
+                        objectKey = objectKey.replace(process.env.AWS_S3_BUCKET + '/', '');
+                    }
+                } else if (urlStr.startsWith('http')) {
+                    // 커스텀 도메인 등을 사용하는 경우
+                    const urlObj = new URL(urlStr);
+                    objectKey = decodeURIComponent(urlObj.pathname.substring(1));
+                }
+
+                if (objectKey) {
+                    console.log(`🗑️ S3 삭제 시도 (버킷: ${process.env.AWS_S3_BUCKET}, 키: ${objectKey})`);
+                    const deleteCommand = new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: objectKey,
+                    });
+                    const s3Res = await s3.send(deleteCommand);
+                    console.log("✅ S3 파일 삭제 완료:", s3Res.$metadata.httpStatusCode);
+                } else {
+                    console.log("⏭️ S3 URL 형식(또는 HTTP)이 아니어서 파일 삭제 생략:", urlStr);
+                }
+            } catch (s3error) {
+                console.warn("⚠️ S3 실제 파일 삭제 실패 (DB는 삭제됨):", s3error);
+            }
         }
         
         await updateProfileImage(userId, null);
