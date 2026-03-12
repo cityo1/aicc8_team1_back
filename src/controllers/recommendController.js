@@ -16,6 +16,39 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const normalizeFoodName = (name = '') =>
+  String(name)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '');
+
+const hasValue = (v) => v !== null && v !== undefined && v !== '';
+const hasCompleteNutrition = (food) =>
+  hasValue(food?.kcal) &&
+  hasValue(food?.carbs) &&
+  hasValue(food?.protein) &&
+  hasValue(food?.fat) &&
+  hasValue(food?.sugar);
+
+const expandMenuKeywords = (menuName = '') => {
+  const base = String(menuName).trim();
+  if (!base) return [];
+
+  const tokens = base
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+
+  const noSpace = base.replace(/\s+/g, '');
+  const chickenMapped = base
+    .replace(/치킨/gi, '닭')
+    .replace(/닭고기/gi, '닭')
+    .trim();
+
+  const keywordSet = new Set([base, noSpace, chickenMapped, ...tokens]);
+  return [...keywordSet].filter(Boolean);
+};
+
 /**
  * [GET] /api/recommend/random
  * 초기 랜덤 식단 조회 데이터 (5개) 반환
@@ -130,18 +163,18 @@ export const recommendFoodsByAI = async (req, res) => {
     const promptMessages = [
       {
         role: 'system',
-        content: `당신은 전문 영양사입니다. 사용자의 요청에 맞춰 한국의 실제 식단을 추천하세요.
-[응답 규칙]
-1. 모든 대화는 한국어로 진행하며 친절하게 설명하세요.
-2. 추천하는 구체적인 메뉴 데이터는 반드시 답변 마지막에 [DATA]와 [/DATA] 태그로 감싸서 JSON 배열 형식으로 포함하세요.
-3. JSON 구조: [{"name": "음식명", "description": "설명", "tags": ["태그1", "태그2"]}]
-4. tags는 반드시 다음 목록에서만 선택하세요: ${filterTags.join(', ')}.
-5. 한 번에 3~5개의 메뉴를 추천하고 실제 음식 DB에서 검색 가능한 메뉴명을 사용하세요.
-6. 추천된 메뉴는 중복되지 않도록 하세요.
-7. 없는 식단을 만들어내지 마세요.
-8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, #, @, ;를 출력하지 마세요.
-9. 답변 양식: 간단한 설명 후 번호. 메뉴이름: 추천이유 순서로 작성하고 마지막에 카드 확인 권유 문구를 넣으세요.
-[사용자정보] ${userContext}`,
+        content: `당신은 전문 영양사입니다. 사용자의 요청에 맞춰 음식DB에서 찾은 음식을 추천하세요.
+          [응답 규칙]
+          1. 모든 대화는 한국어로 진행하며 친절하게 설명하세요.
+          2. 추천하는 구체적인 메뉴 데이터는 반드시 답변 마지막에 [DATA]와 [/DATA] 태그로 감싸서 JSON 배열 형식으로 포함하세요.
+          3. JSON 구조: [{"name": "음식명", "description": "설명", "tags": ["태그1", "태그2"]}]
+          4. tags는 반드시 다음 목록에서만 선택하세요: ${filterTags.join(', ')}.
+          5. 한 번에 3~5개의 메뉴를 추천하고 실제 음식 DB에서 검색 가능한 메뉴명을 사용하세요.
+          6. 추천된 메뉴는 중복되지 않도록 하세요.
+          7. 없는 식단을 만들어내지 마세요.
+          8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, #, @, ;를 출력하지 마세요.
+          9. 답변 양식: 간단한 설명 후 번호. 메뉴이름: 추천이유 순서로 작성하고 마지막에 카드 확인 권유 문구를 넣으세요.
+          [사용자정보] ${userContext}`,
       },
       ...messages
         .filter(
@@ -172,40 +205,110 @@ export const recommendFoodsByAI = async (req, res) => {
     // 3. [DATA] 태그에서 음식명 추출
     const dataRegex = /\[DATA\]([\s\S]*?)\[\/DATA\]/;
     const match = aiResponseContent.match(dataRegex);
+    let parsedMenuData = [];
     let searchKeywords = [];
     const cleanTextMessage = aiResponseContent.replace(dataRegex, '').trim();
 
     if (match && match[1]) {
       try {
         const parsedData = JSON.parse(match[1]);
-        searchKeywords = parsedData.map((item) => item.name).filter(Boolean);
+        if (Array.isArray(parsedData)) {
+          parsedMenuData = parsedData
+            .map((item) => ({
+              name: item?.name?.trim(),
+              description: item?.description || '',
+              tags: Array.isArray(item?.tags) ? item.tags : [],
+            }))
+            .filter((item) => item.name);
+          searchKeywords = [
+            ...new Set(
+              parsedMenuData.flatMap((item) => expandMenuKeywords(item.name)),
+            ),
+          ];
+        }
       } catch (e) {
         console.error('AI [DATA] JSON 파싱 에러:', e);
       }
     }
 
     // 4. DB에서 음식 검색
-    let recommendedFoods = await searchFoodsByKeywords(searchKeywords);
-    if (!recommendedFoods || recommendedFoods.length === 0) {
-      recommendedFoods = await getRandomFoods(3);
+    let dbFoods = await searchFoodsByKeywords(searchKeywords);
+    if (!dbFoods || dbFoods.length === 0) {
+      dbFoods = await getRandomFoods(3);
     }
 
     // 5. 알레르기·식이제한에 맞지 않는 음식 제외
     const excluded = getExcludedKeywords(user || {});
-    recommendedFoods = filterFoodsByUser(recommendedFoods, excluded);
-    recommendedFoods = recommendedFoods.slice(0, 3);
+    dbFoods = filterFoodsByUser(dbFoods, excluded);
 
-    const responseFoodsList = recommendedFoods.map((f) => ({
-      id: f.id,
-      name: f.name,
-      image: f.image,
-      kcal: f.kcal,
-      carbs: f.carbs,
-      protein: f.protein,
-      fat: f.fat,
-      sugar: f.sugar,
-      status: f.status,
-    }));
+    let responseFoodsList = [];
+
+    if (parsedMenuData.length > 0) {
+      const dbPool = [...dbFoods];
+
+      responseFoodsList = parsedMenuData
+        .map((menu, idx) => {
+          const targets = expandMenuKeywords(menu.name)
+            .map((kw) => normalizeFoodName(kw))
+            .filter(Boolean);
+
+          const foundIdx = dbPool.findIndex((f) => {
+            const dbName = normalizeFoodName(f.name);
+            return targets.some(
+              (target) => dbName.includes(target) || target.includes(dbName),
+            );
+          });
+
+          if (foundIdx >= 0) {
+            const matched = dbPool.splice(foundIdx, 1)[0];
+            return {
+              id: matched.id ?? `ai-${idx}-${menu.name}`,
+              name: menu.name,
+              image: matched.image ?? null,
+              kcal: matched.kcal ?? null,
+              carbs: matched.carbs ?? null,
+              protein: matched.protein ?? null,
+              fat: matched.fat ?? null,
+              sugar: matched.sugar ?? null,
+              status: matched.status ?? null,
+              description: menu.description,
+              tags: menu.tags,
+            };
+          }
+
+          return {
+            id: `ai-${idx}-${menu.name}`,
+            name: menu.name,
+            image: null,
+            kcal: null,
+            carbs: null,
+            protein: null,
+            fat: null,
+            sugar: null,
+            status: null,
+            description: menu.description,
+            tags: menu.tags,
+          };
+        })
+        .slice(0, 3);
+    } else {
+      responseFoodsList = dbFoods.slice(0, 3).map((f) => ({
+        id: f.id,
+        name: f.name,
+        image: f.image,
+        kcal: f.kcal,
+        carbs: f.carbs,
+        protein: f.protein,
+        fat: f.fat,
+        sugar: f.sugar,
+        status: f.status,
+        description: '',
+        tags: [],
+      }));
+    }
+
+    // 영양소 5개 항목이 모두 있는 카드만 반환
+    responseFoodsList = responseFoodsList.filter(hasCompleteNutrition);
 
     // 6. 추천 기록 DB 저장
     const recId = uuidv4();
