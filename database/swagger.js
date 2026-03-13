@@ -10,6 +10,10 @@ const options = {
         },
         servers: [
             {
+                url: "https://honeymat.site",
+                description: "Production server",
+            },
+            {
                 url: "http://localhost:8000",
                 description: "Local server",
             },
