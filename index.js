@@ -31,6 +31,7 @@ const app = express();
 // Set uploads directory as static route
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // test
+
 app.use(
   cors({
     origin: ['https://honeymat.site', 'http://localhost:5173'],
